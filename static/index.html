@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API H</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --err: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 2rem 1rem;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
+  .sub { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.95rem; }
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    vertical-align: middle;
+  }
+  .badge.live { border-color: var(--ok); color: var(--ok); }
+  .badge.mock { border-color: var(--warn); color: var(--warn); }
+  .badge.err  { border-color: var(--err); color: var(--err); }
+  .controls { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1rem 0 1.5rem; }
+  button {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 1.1rem;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: wait; }
+  label { color: var(--muted); font-size: 0.9rem; }
+  input[type="number"] {
+    width: 4.5rem;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.6rem;
+    font-size: 0.95rem;
+  }
+  .meta {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+    text-align: center;
+  }
+  .meta .path {
+    font-size: 4rem;
+    font-weight: 800;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    line-height: 1.1;
+  }
+  .meta .path.http  { color: var(--ok); }
+  .meta .path.agent { color: var(--warn); }
+  .meta .latency { font-size: 2.2rem; color: var(--accent); font-weight: 600; }
+  .meta .caption { color: var(--muted); font-size: 0.85rem; margin-top: 0.35rem; }
+  .viewer {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    overflow-x: auto;
+    min-height: 8rem;
+  }
+  pre {
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    white-space: pre;
+    color: var(--text);
+  }
+  .status { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.5rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>API H</h1>
+  <p class="sub">
+    Compile a website workflow into a versioned contract; serve it HTTP-first, H agent as fallback.
+    &nbsp;H mode: <span id="hmode" class="badge">checking…</span>
+  </p>
+
+  <div class="controls">
+    <label>limit <input id="limit" type="number" value="5" min="1" max="30"></label>
+    <button id="btn-compile">Compile</button>
+    <button id="btn-run-http">Run (http)</button>
+    <button id="btn-run-agent">Run (force agent)</button>
+  </div>
+
+  <div id="meta" class="meta">
+    <div id="meta-path" class="path">—</div>
+    <div class="caption">meta.path</div>
+    <div id="meta-latency" class="latency">—</div>
+    <div class="caption">latency_ms</div>
+  </div>
+
+  <p id="status" class="status">Response appears below.</p>
+  <div class="viewer"><pre id="out">(nothing yet)</pre></div>
+</main>
+
+<script>
+"use strict";
+
+const SLUG = "hn-top-stories";
+const out = document.getElementById("out");
+const statusEl = document.getElementById("status");
+const metaBox = document.getElementById("meta");
+const metaPath = document.getElementById("meta-path");
+const metaLatency = document.getElementById("meta-latency");
+const buttons = document.querySelectorAll("button");
+
+function show(obj) {
+  out.textContent = JSON.stringify(obj, null, 2);
+}
+
+function setBusy(busy, msg) {
+  buttons.forEach((b) => (b.disabled = busy));
+  if (msg) statusEl.textContent = msg;
+}
+
+function showMeta(meta) {
+  if (!meta) { metaBox.style.display = "none"; return; }
+  metaPath.textContent = meta.path;
+  metaPath.className = "path " + (meta.path === "http" ? "http" : "agent");
+  metaLatency.textContent = meta.latency_ms + " ms";
+  metaBox.style.display = "block";
+}
+
+async function api(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { "content-type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let json;
+  try { json = await res.json(); } catch { json = { error: "non-JSON response", status: res.status }; }
+  return { status: res.status, json };
+}
+
+async function loadHealth() {
+  const el = document.getElementById("hmode");
+  try {
+    const { json } = await api("GET", "/health");
+    el.textContent = json.h_mode;
+    el.className = "badge " + (json.h_mode === "live" ? "live" : "mock");
+  } catch {
+    el.textContent = "unreachable";
+    el.className = "badge err";
+  }
+}
+
+async function compile() {
+  setBusy(true, "Compiling…");
+  showMeta(null);
+  try {
+    const { status, json } = await api("POST", `/v1/workflows/${SLUG}/compile`, {
+      engine: "auto",
+      activate: true,
+    });
+    show(json);
+    statusEl.textContent = status < 300
+      ? `Compiled — contract v${json.contract ? json.contract.version : "?"}`
+      : `Compile failed (HTTP ${status})`;
+  } catch (e) {
+    show({ error: String(e) });
+    statusEl.textContent = "Compile failed — is the server running and seeded?";
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function run(forcePath) {
+  const limit = parseInt(document.getElementById("limit").value, 10) || 5;
+  const body = { input: { limit } };
+  if (forcePath) body.force_path = forcePath;
+  setBusy(true, forcePath === "agent" ? "Running via agent (slow — full browse)…" : "Running…");
+  showMeta(null);
+  try {
+    const { status, json } = await api("POST", `/v1/workflows/${SLUG}/run`, body);
+    show(json);
+    if (json.meta) {
+      showMeta(json.meta);
+      statusEl.textContent = `HTTP ${status} — run ${json.meta.run_id}`;
+    } else {
+      statusEl.textContent = `HTTP ${status}`;
+    }
+  } catch (e) {
+    show({ error: String(e) });
+    statusEl.textContent = "Run failed — is the server running and seeded?";
+  } finally {
+    setBusy(false);
+  }
+}
+
+document.getElementById("btn-compile").addEventListener("click", compile);
+document.getElementById("btn-run-http").addEventListener("click", () => run(null));
+document.getElementById("btn-run-agent").addEventListener("click", () => run("agent"));
+
+loadHealth();
+</script>
+</body>
+</html>
