@@ -5,7 +5,12 @@ from urllib.parse import urlparse
 
 import httpx
 
-ALLOWED_HOSTS: set[str] = {"hacker-news.firebaseio.com"}  # SSRF allowlist
+ALLOWED_HOSTS: set[str] = {  # SSRF allowlist
+    "hacker-news.firebaseio.com",
+    "wttr.in",
+    "openlibrary.org",
+    "countries.trevorblades.com",
+}
 
 
 class SSRFBlockedError(Exception): ...
@@ -33,6 +38,13 @@ def get_client() -> httpx.AsyncClient:
 async def get_json(url: str) -> object:
     assert_host_allowed(url)
     resp = await get_client().get(url)
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def post_json(url: str, json_body: dict) -> object:
+    assert_host_allowed(url)
+    resp = await get_client().post(url, json=json_body)
     resp.raise_for_status()
     return resp.json()
 

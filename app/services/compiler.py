@@ -16,23 +16,58 @@ from app.services import contract_store, h_client, schema_infer
 
 HN_HOSTS = {"news.ycombinator.com"}
 
-_HN_HTTP_BLOCK = {
-    "enabled": True,
-    "description": "HN Firebase API",
-    "steps": [
-        {
-            "name": "topstories",
-            "method": "GET",
-            "url_template": "https://hacker-news.firebaseio.com/v0/topstories.json",
-        },
-        {
-            "name": "item",
-            "method": "GET",
-            "url_template": "https://hacker-news.firebaseio.com/v0/item/{id}.json",
-            "foreach": "top_ids",
-        },
-    ],
-    "mapper": "hn_firebase_v0",
+# hostname → known HTTP path (mapper + steps) attached at compile time; method=hybrid.
+SPECIALIZATIONS: dict[str, dict] = {
+    "news.ycombinator.com": {
+        "mapper": "hn_firebase_v0",
+        "description": "HN Firebase API",
+        "steps": [
+            {
+                "name": "topstories",
+                "method": "GET",
+                "url_template": "https://hacker-news.firebaseio.com/v0/topstories.json",
+            },
+            {
+                "name": "item",
+                "method": "GET",
+                "url_template": "https://hacker-news.firebaseio.com/v0/item/{id}.json",
+                "foreach": "top_ids",
+            },
+        ],
+    },
+    "wttr.in": {
+        "mapper": "wttr_v0",
+        "description": "wttr.in JSON weather API",
+        "steps": [
+            {
+                "name": "current",
+                "method": "GET",
+                "url_template": "https://wttr.in/{city}?format=j1",
+            }
+        ],
+    },
+    "openlibrary.org": {
+        "mapper": "openlibrary_search_v0",
+        "description": "Open Library search API",
+        "steps": [
+            {
+                "name": "search",
+                "method": "GET",
+                "url_template": "https://openlibrary.org/search.json?q={q}&limit={limit}",
+            }
+        ],
+    },
+    "countries.trevorblades.com": {
+        "mapper": "graphql_countries_v0",
+        "description": "Countries GraphQL API",
+        "steps": [
+            {
+                "name": "countries",
+                "method": "POST",
+                "url_template": "https://countries.trevorblades.com/",
+            }
+        ],
+    },
 }
 
 _HN_PROMPT = (
@@ -45,6 +80,15 @@ _HN_PROMPT = (
 def is_hn(workflow: models.Workflow) -> bool:
     host = urlparse(workflow.site).hostname
     return host in HN_HOSTS or workflow.slug.startswith("hn")
+
+
+def find_specialization(workflow: models.Workflow) -> dict | None:
+    host = urlparse(workflow.site).hostname
+    if host in SPECIALIZATIONS:
+        return SPECIALIZATIONS[host]
+    if workflow.slug.startswith("hn"):
+        return SPECIALIZATIONS["news.ycombinator.com"]
+    return None
 
 
 def _field_names(output_schema: dict) -> list[str]:
@@ -107,15 +151,18 @@ async def discover_schemas(
 def build_contract_body(
     workflow: models.Workflow,
     *,
-    hn: bool,
+    hn: bool = False,
     engine: str,
     session_id: str | None,
     notes: str,
     sample: dict | None = None,
+    specialization: dict | None = None,
 ) -> dict:
     input_schema = json.loads(workflow.input_schema_json)
     output_schema = json.loads(workflow.output_schema_json)
-    if hn:
+    if hn and specialization is None:  # backcompat: hn=True means the HN specialization
+        specialization = SPECIALIZATIONS["news.ycombinator.com"]
+    if specialization is not None and specialization["mapper"] == "hn_firebase_v0":
         prompt = _HN_PROMPT
     else:
         fields = ", ".join(_field_names(output_schema)) or "per output schema"
@@ -125,6 +172,15 @@ def build_contract_body(
             "Return only data matching the schema; do not invent URLs — "
             "omit unknown values rather than guessing."
         )
+    if specialization is not None:
+        http_block = {
+            "enabled": True,
+            "description": specialization["description"],
+            "steps": copy.deepcopy(specialization["steps"]),
+            "mapper": specialization["mapper"],
+        }
+    else:
+        http_block = {"enabled": False}
     return {
         "id": None,  # id/workflow_id/version finalized by contract_store.insert_contract
         "workflow_id": workflow.id,
@@ -135,8 +191,8 @@ def build_contract_body(
         "goal": workflow.goal,
         "input_schema": input_schema,
         "output_schema": output_schema,
-        "method": "hybrid" if hn else "agent",
-        "http": copy.deepcopy(_HN_HTTP_BLOCK) if hn else {"enabled": False},
+        "method": "hybrid" if specialization is not None else "agent",
+        "http": http_block,
         "agent": {
             "enabled": True,
             "agent_id": get_settings().hai_agent,
@@ -230,14 +286,21 @@ async def compile_workflow(
             db.commit()
             return schemas.CompileResponse(job=_job_out(job), contract=None)
 
-    hn = is_hn(workflow)
-    notes = (
-        "Discovered or selected Firebase path for HN"
-        if hn
-        else "Agent-only contract; no known HTTP path"
-    ) + notes_extra
+    spec = find_specialization(workflow)
+    if spec is None:
+        notes = "Agent-only contract; no known HTTP path"
+    elif spec["mapper"] == "hn_firebase_v0":
+        notes = "Discovered or selected Firebase path for HN"
+    else:
+        notes = f"Selected known HTTP path via mapper {spec['mapper']}"
+    notes += notes_extra
     body = build_contract_body(
-        workflow, hn=hn, engine=engine, session_id=session_id, notes=notes, sample=sample
+        workflow,
+        engine=engine,
+        session_id=session_id,
+        notes=notes,
+        sample=sample,
+        specialization=spec,
     )
     contract = contract_store.insert_contract(db, workflow, body, method=body["method"])
     if req.activate:

@@ -220,6 +220,26 @@ Tests run fully offline (no network, no key):
 uv run pytest
 ```
 
+### Hard eval battery
+
+Beyond the offline suite (mappers, router, SSRF allowlist, 20-way `/run` concurrency),
+`scripts/hard_eval.py` drives a **running server** through a 19-task battery — HTTP-API
+sites, GraphQL, and JS-heavy agent sites (CSR, SPA, infinite scroll, consent walls) —
+recording per-run JSONL and a markdown report with cohort stats, failure taxonomy, and
+gate results (see `docs/EVAL-SPEC.md`). Live agent tasks cost real H sessions, so cap
+them:
+
+```bash
+uv run uvicorn app.main:app --port 8000     # terminal 1
+uv run python scripts/hard_eval.py \
+  --base-url http://127.0.0.1:8000 --tasks all \
+  --h-concurrency 2 --max-agent-runs-total 40 --max-cost-usd 5.0 \
+  --out data/eval_results.jsonl --report data/eval_report.md
+```
+
+Use `--tasks weather-wttr,graphql-countries` for a cheap HTTP-only smoke, and
+`--skip-compile-if-active` to reuse already-compiled contracts.
+
 ## Architecture
 
 ```

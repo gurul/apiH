@@ -298,6 +298,9 @@ viewer, `meta.path` + latency in large text. No React.
 - test_force_path_agent uses mock H
 - test_schema_validation_fails (invalid output → path failure / run not ok)
 - test_ssrf_blocked (non-allowlisted host rejected)
+- eval battery regressions: new mappers + widened SSRF allowlist (tests/test_new_mappers.py)
+  and 20-way concurrent /run (tests/test_concurrency.py); the live JS-heavy battery is
+  scripts/hard_eval.py per docs/EVAL-SPEC.md
 
 ## Acceptance checklist
 
