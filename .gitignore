@@ -7,3 +7,6 @@ data/*.db-*
 contracts/*.json
 !contracts/sample_*.json
 .env
+.DS_Store
+motion/node_modules/
+motion/out/frame-*.png

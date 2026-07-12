@@ -1,5 +1,13 @@
 # API H (H Company Computer Use Agent Project)
 
+## Product film
+
+<video src="motion/out/api-h-product-film.mp4" poster="motion/out/api-h-cover.png" controls width="100%">
+  <a href="motion/out/api-h-product-film.mp4">Watch the API H product film</a>
+</video>
+
+[Watch the 36-second API H product film](motion/out/api-h-product-film.mp4)
+
 API H turns a website workflow into a versioned JSON contract and exposes the
 workflow through a REST endpoint. At run time, it uses a registered HTTP mapper
 when one matches the workflow's host. If that path fails during execution or

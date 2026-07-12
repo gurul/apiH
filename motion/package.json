@@ -1,0 +1,21 @@
+{
+  "name": "api-h-motion",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts APIH out/api-h-product-film.mp4",
+    "still": "remotion still src/index.ts APIH-Still out/api-h-cover.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.488",
+    "remotion": "4.0.488",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.2"
+  }
+}
