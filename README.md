@@ -2,14 +2,14 @@
 
 API H turns a website workflow into a versioned JSON contract and exposes the
 workflow through a REST endpoint. At run time, it uses a registered HTTP mapper
-when one matches the workflow's host. If that path fails validation, it can call
-an H Company Computer-Use agent instead. A successful response reports the path
-used, the contract version, and the path latency in `meta`.
+when one matches the workflow's host. If that path fails during execution or
+output checks, it can call an H Company Computer-Use agent instead. A successful
+response reports the path used, the contract version, and the path latency in
+`meta`.
 
-HTTP support is currently implemented for four hosts: Hacker News, wttr.in,
-Open Library, and the Countries GraphQL API. Workflows for other hosts use the H
-agent on every run. Schema discovery infers input and output JSON schemas; it does
-not discover new HTTP APIs.
+API H has registered HTTP mappers for four hosts: Hacker News, wttr.in, Open
+Library, and the Countries GraphQL API. Other hosts use the H agent for every
+run. Schema discovery infers JSON schemas; it does not discover HTTP APIs.
 
 ## Quick start
 
@@ -33,8 +33,9 @@ uv run python scripts/seed.py
 ./scripts/demo_curl.sh
 ```
 
-The seed script is idempotent. If the workflow already exists, the script creates
-and activates its next contract version.
+The seed script is safe to rerun. Each rerun creates and activates the next
+contract version. `demo_curl.sh` compiles once more before its requests, so
+running both commands on a fresh database ends at version 2.
 
 Open <http://127.0.0.1:8000/> for the small demo UI. You can also call the seeded
 workflow directly:
@@ -48,8 +49,8 @@ curl -s -X POST http://127.0.0.1:8000/v1/workflows/hn-top-stories/run \
 
 The default configuration uses the H mock. The request above still needs network
 access because its normal path calls the public Hacker News API. If that HTTP
-request fails, the hybrid contract tries the mock agent, whose Hacker News shaped
-placeholder may satisfy this workflow's schema.
+request fails, the hybrid contract tries the mock agent, whose placeholder is
+shaped like Hacker News data and may satisfy this workflow's schema.
 
 Run the test suite with:
 
@@ -67,41 +68,21 @@ input defaults, executes its configured paths, validates the result, and records
 one run row.
 
 ```text
-+-----------------------------+
-| Client                      |
-| curl, UI, or another client |
-+-------------+---------------+
-              | POST /compile
-              v
-+-----------------------------+       +----------------------+
-| Compiler                    |------>| H Computer-Use agent |
-| schemas and contract        |       | live or mock         |
-+-------------+---------------+       +----------------------+
-              |
-              v
-+-----------------------------+
-| SQLite                      |
-| workflows, contracts, runs  |
-+-------------+---------------+
-              ^
-              | load contract and save run
-+-------------+---------------+
-| Runtime router              |
-| HTTP mapper, then agent     |
-+------+------+---------------+
-       |      |
-       |      +------------------------> H Computer-Use agent
-       v
-+-----------------------------+
-| Allowlisted HTTP API        |
-+-----------------------------+
+POST /compile:
+Client -> compiler -> optional H session -> versioned contract -> SQLite
+
+POST /run:
+Client -> router -> load contract from SQLite
+                 -> registered HTTP mapper -> allowlisted API
+                 -> H agent or mock when the agent path is used
+                 -> validate result -> save run to SQLite -> response
 ```
 
 ### Compilation
 
 When a workflow has an object `output_schema` with properties, compilation uses
-the stored schemas. In live mode, H performs one verification run. Mock mode skips
-that verification.
+the stored schemas. With `engine: "auto"`, live mode performs one H verification
+run and mock mode skips it.
 
 When the output schema is missing or has no properties, compilation performs one
 discovery run. API H derives inputs from `{{name}}` placeholders in the goal and
@@ -111,10 +92,10 @@ strings. For arrays of objects, a field is required only when every sampled item
 contains a non-null value for that field.
 
 Discovery uses the configured global H mode. In mock mode, the sample is a
-deterministic Hacker News shaped object, so schemas discovered in mock mode are
-development placeholders. An explicit array schema, primitive schema, or empty
-object schema also triggers discovery because the current implementation looks for
-object properties.
+deterministic object shaped like Hacker News data, so schemas discovered in mock
+mode are development placeholders. An explicit array schema, primitive schema, or
+empty object schema also triggers discovery because the current implementation
+looks for object properties.
 
 After resolving the schemas, the compiler matches the workflow hostname against
 the registered HTTP integrations. A match creates a `hybrid` contract. Every other
@@ -134,9 +115,9 @@ the previous active version deprecated. It also attempts to export the JSON to
 | Every configured path fails | Store the failed run and return 502 with its `run_id` and path errors |
 
 The router validates input and output with JSON Schema. Contract health rules can
-also require a minimum array length and specific result fields. An HTTP path that
-exceeds its 15 second budget logs a warning. An agent path that exceeds its 10
-minute budget fails its health check.
+also require a minimum array length and specific result fields. If an HTTP path
+runs longer than 15 seconds, the router logs a warning. If an agent path runs
+longer than 10 minutes, its health check fails.
 
 For a successful fallback, `meta.latency_ms` measures the path that returned the
 result. It does not include time spent in an earlier failed path. Mock executions
@@ -153,11 +134,14 @@ in a contract records plan metadata; the runtime does not interpret those steps.
 | `news.ycombinator.com` | `hn_firebase_v0` | `hacker-news.firebaseio.com` | Ranked stories from the top, ask, or show feed |
 | `wttr.in` | `wttr_v0` | `wttr.in` | Temperature, humidity, and weather description for a city |
 | `openlibrary.org` | `openlibrary_search_v0` | `openlibrary.org` | Works matching a nonempty query |
-| `countries.trevorblades.com` | `graphql_countries_v0` | `countries.trevorblades.com` | Country names for a two letter continent code |
+| `countries.trevorblades.com` | `graphql_countries_v0` | `countries.trevorblades.com` | Country names for a two-letter continent code |
 
 Adding another HTTP integration requires a mapper in
 `app/services/http_executors`, registration in that package, a compiler
 specialization, and an allowlist entry for its HTTPS host.
+
+The hostname matcher does not inspect the workflow goal or path. Output
+validation and fallback handle mismatches.
 
 ## Discover schemas
 
@@ -175,7 +159,7 @@ curl -s -X POST http://127.0.0.1:8000/v1/workflows \
   }' | jq
 ```
 
-Compile and activate version 1:
+For a new workflow, compile and activate version 1:
 
 ```bash
 curl -s -X POST \
@@ -197,10 +181,9 @@ Craigslist has no registered mapper in this repository, so this contract uses th
 agent for each run. Use live mode for a meaningful schema and result. Mock mode
 returns the generic placeholder described above.
 
-The current API cannot replace a workflow's stored schemas. Once discovery has
-filled `output_schema`, `/recompile` creates another contract version with that
-schema instead of discovering it again. If the inferred schema is unsuitable,
-create a new workflow with explicit object schemas and a new slug.
+API H cannot replace stored schemas. After discovery fills `output_schema`,
+`/recompile` reuses that schema for the next contract version. To change it,
+create a workflow with explicit object schemas and a new slug.
 
 ## Contract format
 
@@ -208,7 +191,7 @@ A contract stores JSON schemas, routing configuration, validation rules, and the
 agent prompt. It describes how to fetch data for a new input; each run performs the
 configured work.
 
-This abbreviated Hacker News contract shows the fields used by the router:
+An abbreviated Hacker News contract contains the router fields below:
 
 ```json
 {
@@ -290,8 +273,8 @@ This abbreviated Hacker News contract shows the fields used by the router:
 }
 ```
 
-The full contract body is available through the contracts endpoint and the JSON
-export created during activation.
+The contracts endpoint returns the full contract. Activation also attempts to
+export it as JSON.
 
 ## REST API
 
@@ -309,19 +292,19 @@ export created during activation.
 | `GET` | `/v1/runs/{run_id}` | Read one run |
 | `GET` | `/v1/workflows/{id_or_slug}/openapi.json` | Get an OpenAPI document for one workflow's run endpoint |
 
-FastAPI also provides `/docs`, `/redoc`, and the service wide `/openapi.json`.
+FastAPI also provides `/docs`, `/redoc`, and the service-wide `/openapi.json`.
 Duplicate slugs return 409. Invalid request models return 422. Bad run input or an
 unavailable forced path returns 400. Missing workflows or contracts return 404.
 When every run path fails, the response is 502 with `ok`, `errors`, and `run_id`.
-A failed compile is represented by a 200 response whose `job.status` is `failed`
-and whose `contract` is `null`.
+For a failed compile, the API returns HTTP 200, `job.status: "failed"`, and
+`contract: null`.
 
 ## H integration and configuration
 
 API H calls [H Company Computer-Use Agents](https://hub.hcompany.ai/computer-use-agents/introduction)
-through the `hai-agents` Python SDK. The default agent is `h/web-surfer-pro`.
-`hai-agents` is already listed in `pyproject.toml`, so `uv sync` installs it. Mock
-mode does not call the SDK.
+through the `hai-agents` Python SDK. Running `uv sync` installs the SDK from
+`pyproject.toml`. The default agent is `h/web-surfer-pro`; mock mode skips the
+SDK.
 
 The application has no Browserbase or Stagehand dependency. The live and mock modes
 share the same contract and router code.
@@ -336,10 +319,9 @@ Common settings are listed in `.env.example`:
 | `HAI_ENVIRONMENT` | `EU` | Selects the H SDK environment; supported values are `EU` and `US` |
 | `API_H_DATABASE_URL` | `sqlite:///./data/api_h.db` | Selects the SQLite database file |
 
-The sample also defines `API_H_HOST`, `API_H_PORT`, and `LOG_LEVEL`. The current
-`uvicorn app.main:app` entry command does not use them. Pass `--host`, `--port`, or
-`--log-level` to Uvicorn instead. Settings are read when the process starts, so
-restart the server after changing `.env`.
+`API_H_HOST`, `API_H_PORT`, and `LOG_LEVEL` in `.env.example` do not affect the
+documented start command. Pass their values with Uvicorn's `--host`, `--port`,
+and `--log-level` flags, then restart the server.
 
 ## Use a live H agent
 
@@ -362,10 +344,9 @@ curl -s http://127.0.0.1:8000/health | jq
 ```
 
 The response should contain `"h_mode": "live"`. Live compilation may consume one
-H session, and every agent path run consumes another. The
-[live walkthrough](docs/LIVE-DEMO.md) uses Craigslist to demonstrate schema
-discovery. Its extra `uv add hai-agents` command is unnecessary with the current
-`pyproject.toml`.
+H session, and each agent path run consumes another. The
+[live walkthrough](docs/LIVE-DEMO.md) demonstrates schema discovery with
+Craigslist.
 
 ## Evaluation results
 
@@ -378,7 +359,7 @@ results.
 | Path and task group | Runs | Successful | Median latency | Approximate mean H cost |
 |---|---|---|---|---|
 | Registered HTTP path | 80 | 80 | 219 ms | $0.00 |
-| Agent path on JavaScript heavy tasks | 11 | 10 | 38.2 s | $0.04 |
+| Agent path on JavaScript-heavy tasks | 11 | 10 | 38.2 s | $0.04 |
 | Agent path on other tasks | 4 | 4 | 105 s | $0.09 |
 
 The five remaining records were deliberate agent probes on workflows that also had
@@ -413,10 +394,13 @@ script's forced agent probes, use:
 ```bash
 uv run python scripts/hard_eval.py \
   --tasks weather-wttr,graphql-countries \
-  --max-agent-runs-total 0
+  --max-agent-runs-total 0 \
+  --out /tmp/api_h_smoke.jsonl \
+  --report /tmp/api_h_smoke.md
 ```
 
-Use `--skip-compile-if-active` to reuse active contracts.
+The supplied `--out` and `--report` paths are overwritten. Use
+`--skip-compile-if-active` to reuse active contracts.
 
 ## Autobrowse comparison
 
@@ -441,11 +425,11 @@ Autobrowse and API H store different runtime artifacts.
   contract schema and returns 502 when all paths fail.
 - Authentication walls, credential storage, persistent browser sessions, and CAPTCHA
   handling are outside this MVP.
-- Mock mode tests router plumbing. Its generic Hacker News shaped answer often fails
-  schemas written for other sites.
-- HTTP executors accept HTTPS requests only to
+- Mock mode tests router plumbing. Its answer is shaped like Hacker News data and
+  often fails schemas written for other sites.
+- HTTP executors allow HTTPS requests only to
   `hacker-news.firebaseio.com`, `wttr.in`, `openlibrary.org`, and
-  `countries.trevorblades.com`. Every other destination is rejected.
+  `countries.trevorblades.com`, and reject every other destination.
 - Application code does not log `HAI_API_KEY`. Keep the key in the ignored `.env`
   file and out of commands that may enter shell history.
 - Schema or site drift requires manual intervention. Recompile creates a version but
