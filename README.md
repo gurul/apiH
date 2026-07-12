@@ -25,6 +25,54 @@ Analogy: the H agent is a person walking through the building. The contract is t
 receptionist window. The HTTP path is phoning the records room. The agent path is sending
 the person to walk the building again.
 
+## Measured results (live 19-site eval)
+
+All numbers below are from a live battery against real sites with real H sessions —
+100 recorded runs, $1.24 total spend, K=2 concurrent sessions. Raw data:
+[`data/eval_results.jsonl`](data/eval_results.jsonl) · full report:
+[`data/eval_report.md`](data/eval_report.md).
+
+| Cohort | Runs | Success | p50 latency | Cost per run |
+|---|---|---|---|---|
+| **HTTP-graduated contracts** (HN, wttr, Open Library, GraphQL) | 85 | 100% | **236 ms** | **$0.00** |
+| **Agent path, JS-heavy sites** (CSR, SPA, scroll, consent, bot walls) | 11 | 91% | 38.2 s | ~$0.04 |
+| Agent path, other | 4 | 100% | 105 s | ~$0.09 |
+
+The two paths live in different universes — that gap is the product:
+
+```mermaid
+xychart-beta
+    title "HTTP-graduated contracts — median latency (ms)"
+    x-axis ["graphql-countries", "weather-wttr", "openlibrary", "hn-ask-show", "hn-top (burst)"]
+    y-axis "milliseconds" 0 --> 700
+    bar [64, 174, 180, 216, 648]
+```
+
+```mermaid
+xychart-beta
+    title "Agent path — median latency per task (seconds)"
+    x-axis ["spa-nav", "quotes-js", "books", "gh-repo", "demoqa", "algolia", "gh-issues", "wikipedia", "quotes-scroll", "multi-step", "craigslist", "consent", "hn-thread"]
+    y-axis "seconds" 0 --> 180
+    bar [23.8, 28.6, 31.7, 32.4, 34.3, 38.2, 53.2, 76.6, 78.5, 98.6, 103.3, 111.9, 170.2]
+```
+
+Amortization — the same 20 requests, both ways. The agent line is measured means
+(80 s, 6.5¢/run); the HTTP line is the measured concurrent burst (16.7 s total, $0):
+
+```mermaid
+xychart-beta
+    title "Cumulative cost of N requests (USD) — flat line = HTTP contract"
+    x-axis "requests" [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+    y-axis "USD" 0 --> 1.4
+    line [0, 0.13, 0.26, 0.39, 0.52, 0.65, 0.78, 0.91, 1.05, 1.18, 1.31]
+    line [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+```
+
+The JS litmus tests both passed live via **discovered** (not hand-written) schemas:
+`quotes.toscrape.com/js` (CSR-rendered, 28.6 s) and `/scroll` (infinite scroll, 78.5 s).
+The one failure was the right kind: a bot wall reported as `blocked` in 24.6 s —
+fail-closed, no hang, no fabricated data.
+
 ## Autobrowse vs API H
 
 Same insight (agent runs are expensive; amortize them), different artifact.
@@ -242,6 +290,36 @@ Use `--tasks weather-wttr,graphql-countries` for a cheap HTTP-only smoke, and
 
 ## Architecture
 
+```mermaid
+flowchart TD
+    C["Client<br/>curl · UI · future MCP"] -->|"POST /compile (rare)"| COMP["Compiler<br/>discover schemas · build contract"]
+    C -->|"POST /run (hot)"| RTR["Runtime Router<br/>http first · agent fallback"]
+    COMP -->|one exploration session| H["H Computer-Use<br/>h/web-surfer-pro"]
+    COMP -->|"versioned contract"| DB[("SQLite<br/>workflows · contracts · runs")]
+    RTR -->|load active contract| DB
+    RTR -->|"path=http · 0 H sessions"| API["Allowlisted site APIs<br/>HN Firebase · wttr · Open Library · GraphQL"]
+    RTR -->|"path=agent · 1 H session"| H
+    RTR -->|"validate output_schema + health<br/>fail → 502, never bad data"| C
+```
+
+Every run is one router pass:
+
+```mermaid
+flowchart LR
+    R["/run"] --> Q{"contract has<br/>http path?"}
+    Q -->|yes| HTTP["execute mapper<br/>~236 ms · $0"]
+    Q -->|no| AG["re-trigger H agent<br/>30–170 s · cents"]
+    HTTP --> V{"schema +<br/>health OK?"}
+    V -->|yes| OK["200 · meta.path=http"]
+    V -->|"no, agent enabled"| AG
+    AG --> V2{"schema +<br/>health OK?"}
+    V2 -->|yes| OK2["200 · meta.path=agent"]
+    V2 -->|no| ERR["502 · errors listed<br/>run persisted ok=0"]
+```
+
+<details>
+<summary>ASCII version</summary>
+
 ```
 ┌──────────────────────────────────────────────┐
 │  Client (curl / UI / future MCP)             │
@@ -268,14 +346,17 @@ Use `--tasks weather-wttr,graphql-countries` for a cheap HTTP-only smoke, and
 └──────────────────────────────────────────────┘
 ```
 
+</details>
+
 ## Cost intuition
 
-| Path | Typical latency | Typical cost |
+| Path | Measured latency (live eval) | Measured cost |
 |---|---|---|
-| `http` (HN Firebase) | 100 ms – 2 s | ~$0 |
-| `agent` (H Computer-Use) | 30 s – 120 s | task-level, cents to dollars per run (varies by task; we do not quote exact H pricing) |
+| `http` (graduated contracts) | 64 ms – 1.05 s (p50 236 ms) | $0.00 |
+| `agent` (H Computer-Use) | 24 s – 170 s per run | ~$0.01 – $0.13 per run (from H's own metrics) |
 
-The router exists to keep as many runs as possible in the first row.
+The router exists to keep as many runs as possible in the first row. A visual version of
+these results lives at [`site/index.html`](site/index.html).
 
 ## Caveats
 
@@ -292,13 +373,15 @@ The router exists to keep as many runs as possible in the first row.
 - **Mock mode is a development stand-in, not H.** It returns deterministic fake stories
   after a simulated delay so the codebase runs and tests pass offline. It proves the
   plumbing, not the agent.
-- **HN is specialized.** The `hn_firebase_v0` mapper is hand-built for the wow path. A
-  generic HAR→OpenAPI discovery pipeline is future work, not present.
+- **HTTP graduation is hand-registered.** The four specialized mappers (`hn_firebase_v0`,
+  `wttr_v0`, `openlibrary_search_v0`, `graphql_countries_v0`) are hand-built. A generic
+  HAR→OpenAPI discovery pipeline — automatic graduation — is future work, not present.
 - **The wrapper trap.** If every request ends up on the agent path, you have built a
   proxy with extra steps, not a product. Watch the `path` distribution in `runs`.
-- **SSRF allowlist.** The HTTP executor only calls `hacker-news.firebaseio.com` over
-  https. Any other host is rejected. Widening the allowlist is a deliberate decision,
-  not a config default.
+- **SSRF allowlist.** The HTTP executor only calls four allowlisted hosts over https
+  (`hacker-news.firebaseio.com`, `wttr.in`, `openlibrary.org`,
+  `countries.trevorblades.com`). Any other host is rejected — for GET and POST alike.
+  Widening the allowlist is a deliberate decision, not a config default.
 - **`HAI_API_KEY` is never logged.** Keep it in `.env` (gitignored); see `.env.example`.
 - **Self-healing is manual.** A failing contract is fixed with `POST /recompile`, which
   bumps the version. No automatic doctor yet.
