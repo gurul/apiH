@@ -111,10 +111,14 @@ empty object schema also triggers discovery because the current implementation
 looks for object properties.
 
 After resolving the schemas, the compiler matches the workflow hostname against
-the registered HTTP integrations. A match creates a `hybrid` contract. Every other
-workflow receives an `agent` contract. Activation marks the new version active and
-the previous active version deprecated. It also attempts to export the JSON to
-`contracts/<slug>-v<version>.json`.
+the registered HTTP integrations. In live H mode, an unmatched workflow gets a
+second agent exploration that attempts to generate a restricted public JSON route
+plan. API H accepts that plan only when its HTTPS target passes the generated-route
+URL safety checks, one replay with default inputs succeeds, and the replayed output
+matches the workflow schema. A verified plan
+creates a `hybrid` contract; otherwise the workflow receives an `agent` contract.
+Activation marks the new version active and the previous active version deprecated.
+It also attempts to export the JSON to `contracts/<slug>-v<version>.json`.
 
 ### Runtime routing
 
@@ -153,20 +157,32 @@ report `meta.path` as `agent` because the mock replaces the H call at that bound
 
 ## Registered HTTP paths
 
-The compiler selects these integrations by exact workflow hostname. The named
-Python mapper performs the request and shapes the response. The `http.steps` array
-in a contract records plan metadata; the runtime does not interpret those steps.
+API H has two HTTP sources. The compiler can generate a restricted route plan with
+an H Computer-Use exploration and execute it through `generated_http_v1`; it also
+retains the four built-in route maps below for complex, known workflows. Those host
+maps were created with H Company Computer-Use assistance during development and
+then committed as reviewed Python mappers. A generated plan supports one
+unauthenticated JSON GET or POST, input placeholders, response-path selection, and
+output wrapping. The named Python mappers handle multi-request or custom
+transformation logic.
 
-| Workflow host | Mapper | HTTP destination | Result |
-|---|---|---|---|
-| `news.ycombinator.com` | `hn_firebase_v0` | `hacker-news.firebaseio.com` | Ranked stories from the top, ask, or show feed |
-| `wttr.in` | `wttr_v0` | `wttr.in` | Temperature, humidity, and weather description for a city |
-| `openlibrary.org` | `openlibrary_search_v0` | `openlibrary.org` | Works matching a nonempty query |
-| `countries.trevorblades.com` | `graphql_countries_v0` | `countries.trevorblades.com` | Country names for a two-letter continent code |
+| Workflow host | Mapper | HTTP destination | Provenance | Result |
+|---|---|---|---|---|
+| `news.ycombinator.com` | `hn_firebase_v0` | `hacker-news.firebaseio.com` | H Company-assisted route map | Ranked stories from the top, ask, or show feed |
+| `wttr.in` | `wttr_v0` | `wttr.in` | H Company-assisted route map | Temperature, humidity, and weather description for a city |
+| `openlibrary.org` | `openlibrary_search_v0` | `openlibrary.org` | H Company-assisted route map | Works matching a nonempty query |
+| `countries.trevorblades.com` | `graphql_countries_v0` | `countries.trevorblades.com` | H Company-assisted route map | Country names for a two-letter continent code |
 
-Adding another HTTP integration requires a mapper in
+Adding another hand-written HTTP integration requires a mapper in
 `app/services/http_executors`, registration in that package, a compiler
 specialization, and an allowlist entry for its HTTPS host.
+
+Generated route plans do not require a new Python mapper. They are stored as data
+with `generated_by: "h-computer-use"`, a contract-scoped host allowlist, and replay
+verification metadata. Verification currently means one replay using the workflow's
+default inputs; it is not a broad reliability test. Plans that fail that replay or
+schema validation are discarded.
+Built-in maps record `created_with: "h-company-computer-use"` as their provenance.
 
 The hostname matcher does not inspect the workflow goal or path. Output
 validation and fallback handle mismatches.
@@ -489,18 +505,20 @@ Autobrowse and API H store different runtime artifacts.
 
 | Question | Autobrowse | API H |
 |---|---|---|
-| What happens first? | An agent browses the site | An H agent verifies or discovers a workflow, unless mock mode skips or replaces that work |
-| What is stored? | A reusable skill for a later agent run | A contract with schemas, mapper selection, an agent prompt, and health rules |
+| What happens first? | An agent browses the site | An H agent verifies or discovers a workflow and can generate a replayable HTTP route, unless mock mode replaces that work |
+| What is stored? | A reusable skill for a later agent run | A contract with schemas, a verified generated route or mapper selection, an agent prompt, and health rules |
 | Who calls it later? | Another agent session | A client of the REST service |
 | What handles repeated requests? | Browser infrastructure and an agent | A registered HTTP mapper when available; otherwise H |
 | How are failures handled? | The agent adapts within its session | The router validates results, tries the fallback path, and records failures |
 
 ## Limits and security
 
-- Many workflows remain on the agent path because only four HTTP mappers are
-  registered — the four hosts picked as the MVP evaluation's test set. A
-  workflow that always uses H is an agent proxy with contract validation and
-  run history; it does not gain HTTP cost or latency savings.
+- Workflows remain on the agent path when H cannot identify a simple public JSON
+  request or when the generated route fails replay or schema validation. A workflow
+  that always uses H is an agent proxy with contract validation and run history; it
+  does not gain HTTP cost or latency savings.
+- The four built-in Python mappers cover the hosts selected for the MVP evaluation.
+  Live generated plans cover only simple, unauthenticated, single-request JSON APIs.
 - API H does not check a site's terms of service or `robots.txt`. Review both before
   automating a site. The Hacker News mapper uses the documented public Firebase API.
 - Agent output can vary between runs. API H validates every result against the
@@ -509,11 +527,9 @@ Autobrowse and API H store different runtime artifacts.
   handling are outside this MVP.
 - Mock mode tests router plumbing. Its answer is shaped like Hacker News data and
   often fails schemas written for other sites.
-- HTTP executors allow HTTPS requests only to the four test hosts —
-  `hacker-news.firebaseio.com`, `wttr.in`, `openlibrary.org`, and
-  `countries.trevorblades.com` — and reject every other destination. The
-  allowlist matches the MVP evaluation's test set; extend it when registering a
-  new mapper.
+- Built-in HTTP executors allow HTTPS requests only to the four configured API
+  hosts. A generated route receives a contract-scoped exact-host allowlist after
+  URL checks and successful replay; redirects are not followed.
 - Application code does not log `HAI_API_KEY`. Keep the key in the ignored `.env`
   file and out of commands that may enter shell history.
 - Schema or site drift requires manual intervention. Recompile creates a version but

@@ -1,6 +1,7 @@
 """HTTP executor package — importing it registers all built-in mappers."""
 
 from app.services.http_executors import (  # noqa: F401  (self-register mappers)
+    generated,
     graphql_countries,
     hn_firebase,
     openlibrary,

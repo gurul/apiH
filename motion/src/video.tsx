@@ -126,10 +126,10 @@ const Intro: React.FC<{frame: number}> = ({frame}) => {
       <div style={{position: 'absolute', left: 120, top: 270, width: 1540}}>
         <Eyebrow>Web workflows, compiled</Eyebrow>
         <h1 style={{fontSize: 112, lineHeight: .98, letterSpacing: '-0.055em', fontWeight: 500, margin: '34px 0 34px', transform: `translateY(${(1 - title) * 45}px)`, opacity: title}}>
-          Browse once.<br/><span style={{color: C.http}}>Serve it as an API forever.</span>
+          Browse once.<br/><span style={{color: C.http}}>Generate the route.</span>
         </h1>
         <div style={{fontFamily: sans, fontSize: 31, lineHeight: 1.45, color: C.ink2, width: 1040, opacity: sub, transform: `translateY(${(1 - sub) * 20}px)`}}>
-          API H turns one agent exploration into a versioned contract—then routes every request through the fastest valid path.
+          H Company Computer-Use helped create the built-in host maps. Live H can also propose simple routes that API H replays before activation.
         </div>
       </div>
       <div style={{position: 'absolute', right: 118, bottom: 76, fontFamily: mono, fontSize: 18, color: C.ink3}}>01 / PRODUCT FILM</div>
@@ -163,8 +163,8 @@ const Compile: React.FC<{frame: number}> = ({frame}) => {
   const local = frame - 360;
   const nodes = [
     {x: 110, label: 'EXPLORE', sub: 'one H session', c: C.agent},
-    {x: 735, label: 'CONTRACT', sub: 'versioned procedure', c: '#F2F5F7'},
-    {x: 1360, label: 'ROUTE', sub: 'REST endpoint', c: C.http},
+    {x: 735, label: 'GENERATE', sub: 'agent route map', c: '#F2F5F7'},
+    {x: 1360, label: 'VERIFY', sub: 'replay + schema', c: C.http},
   ];
   const p1 = ease(local, 24, 78), p2 = ease(local, 92, 148);
   return (
@@ -172,8 +172,8 @@ const Compile: React.FC<{frame: number}> = ({frame}) => {
       <Grid dark />
       <div style={{position: 'absolute', left: 100, top: 74}}><Eyebrow color="#8FA0AD">The API H compiler</Eyebrow></div>
       <div style={{position: 'absolute', left: 100, top: 125, right: 100, display: 'flex', justifyContent: 'space-between', alignItems: 'end'}}>
-        <h2 style={{fontSize: 76, lineHeight: 1.05, fontWeight: 500, letterSpacing: '-.04em', margin: 0}}>Pay for discovery once.</h2>
-        <div style={{fontFamily: sans, fontSize: 26, color: '#A9B6C0', width: 580, lineHeight: 1.45}}>Store how to fulfill new inputs—not the answer to one old request.</div>
+        <h2 style={{fontSize: 76, lineHeight: 1.05, fontWeight: 500, letterSpacing: '-.04em', margin: 0}}>H helps map the route.</h2>
+        <div style={{fontFamily: sans, fontSize: 26, color: '#A9B6C0', width: 580, lineHeight: 1.45}}>Built-ins ship as reviewed code. New simple plans activate only after one replay and schema validation.</div>
       </div>
       <div style={{position: 'absolute', left: 0, right: 0, top: 500}}>
         <div style={{height: 4, background: '#313B44', margin: '0 230px'}} />
@@ -190,7 +190,7 @@ const Compile: React.FC<{frame: number}> = ({frame}) => {
           );
         })}
       </div>
-      <div style={{position: 'absolute', left: 365, bottom: 86, display: 'flex', gap: 355, color: '#758490', fontFamily: mono, fontSize: 18}}><span>site + goal</span><span>schema + health</span><span>JSON + meta.path</span></div>
+      <div style={{position: 'absolute', left: 365, bottom: 86, display: 'flex', gap: 355, color: '#758490', fontFamily: mono, fontSize: 18}}><span>site + goal</span><span>HTTP plan</span><span>versioned contract</span></div>
     </Scene>
   );
 };
@@ -202,6 +202,7 @@ const Contract: React.FC<{frame: number}> = ({frame}) => {
     ['"status"', ': "active",', C.ink2],
     ['"method"', ': "hybrid",', C.http],
     ['"http"', ': { "mapper": "hn_firebase_v0" },', C.http],
+    ['"created_with"', ': "h-company-computer-use",', C.http],
     ['"agent"', ': { "fallback": true },', C.agent],
     ['"health"', ': { "schema_gate": true }', '#7BA276'],
   ];
@@ -223,7 +224,7 @@ const Contract: React.FC<{frame: number}> = ({frame}) => {
           <div>{'}'}</div>
         </div>
       </div>
-      <div style={{position: 'absolute', left: 104, bottom: 86, display: 'flex', gap: 15}}><Pill>immutable versions</Pill><Pill>fail closed</Pill><Pill>observable path</Pill></div>
+      <div style={{position: 'absolute', left: 104, bottom: 86, display: 'flex', gap: 15}}><Pill>H-assisted map</Pill><Pill>reviewed mapper</Pill><Pill>agent fallback</Pill></div>
     </Scene>
   );
 };
@@ -310,8 +311,8 @@ export const APIHStill: React.FC = () => (
     <div style={{position: 'absolute', left: 120, top: 78}}><Logo /></div>
     <div style={{position: 'absolute', left: 120, top: 270}}>
       <Eyebrow>Web workflows, compiled</Eyebrow>
-      <h1 style={{fontSize: 112, lineHeight: .98, letterSpacing: '-0.055em', fontWeight: 500, margin: '34px 0'}}>Browse once.<br/><span style={{color: C.http}}>Serve it as an API forever.</span></h1>
-      <div style={{fontFamily: sans, fontSize: 31, color: C.ink2}}>One agent exploration → one versioned contract → fast REST requests.</div>
+      <h1 style={{fontSize: 112, lineHeight: .98, letterSpacing: '-0.055em', fontWeight: 500, margin: '34px 0'}}>Browse once.<br/><span style={{color: C.http}}>Generate the route.</span></h1>
+      <div style={{fontFamily: sans, fontSize: 31, color: C.ink2}}>H-assisted host maps · optional live route proposals · verified REST execution.</div>
     </div>
     <div style={{position: 'absolute', right: 120, bottom: 90, display: 'flex', gap: 14}}><Pill kind="http">236 ms</Pill><Pill kind="agent">38.2 s</Pill></div>
   </AbsoluteFill>
