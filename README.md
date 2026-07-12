@@ -112,10 +112,13 @@ looks for object properties.
 
 After resolving the schemas, the compiler matches the workflow hostname against
 the registered HTTP integrations. In live H mode, an unmatched workflow gets a
-second agent exploration that attempts to generate a restricted public JSON route
-plan. API H accepts that plan only when its HTTPS target passes the generated-route
-URL safety checks, one replay with default inputs succeeds, and the replayed output
-matches the workflow schema. A verified plan
+second agent exploration that browses the site, captures the network requests the
+page actually issues, and derives replayable JSON route candidates from that
+evidence. API H accepts a candidate only when its HTTPS target passes the
+generated-route URL safety checks, its host appears in the captured traffic, and it
+replays successfully across a small matrix of varied inputs (the defaults plus
+schema-derived boundaries) with every output matching the workflow schema.
+Candidates are tried best-first; the first that passes graduates. A verified plan
 creates a `hybrid` contract; otherwise the workflow receives an `agent` contract.
 Activation marks the new version active and the previous active version deprecated.
 It also attempts to export the JSON to `contracts/<slug>-v<version>.json`.
@@ -178,10 +181,14 @@ Adding another hand-written HTTP integration requires a mapper in
 specialization, and an allowlist entry for its HTTPS host.
 
 Generated route plans do not require a new Python mapper. They are stored as data
-with `generated_by: "h-computer-use"`, a contract-scoped host allowlist, and replay
-verification metadata. Verification currently means one replay using the workflow's
-default inputs; it is not a broad reliability test. Plans that fail that replay or
-schema validation are discarded.
+with `generated_by: "h-computer-use"`, a contract-scoped host allowlist, the captured
+network evidence, and replay verification metadata. Verification means replaying the
+candidate across a small matrix of varied inputs (the defaults plus schema-derived
+boundaries, three to five in all) and requiring every replay to succeed and match the
+schema; the per-input results are stored in the contract's `http.verification` block.
+It is a bounded check, not a broad reliability test. A workflow with no evidence-backed
+candidate, or whose candidates each fail an input replay or schema validation, is
+discarded and stays on the agent path.
 Built-in maps record `created_with: "h-company-computer-use"` as their provenance.
 
 The hostname matcher does not inspect the workflow goal or path. Output
@@ -529,7 +536,8 @@ Autobrowse and API H store different runtime artifacts.
   often fails schemas written for other sites.
 - Built-in HTTP executors allow HTTPS requests only to the four configured API
   hosts. A generated route receives a contract-scoped exact-host allowlist after
-  URL checks and successful replay; redirects are not followed.
+  URL checks and successful replay across the varied-input matrix; redirects are not
+  followed.
 - Application code does not log `HAI_API_KEY`. Keep the key in the ignored `.env`
   file and out of commands that may enter shell history.
 - Schema or site drift requires manual intervention. Recompile creates a version but
