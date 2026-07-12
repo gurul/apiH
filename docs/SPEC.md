@@ -262,8 +262,9 @@ wall-clock latency_ms. Never log the full HAI_API_KEY.
 
 - jsonschema against output_schema; failure → path fails
 - health checks: `min_array_length` (dotted path), `required_paths` (dotted paths,
-  numeric segments index arrays), `max_latency_ms` (fail hard for agent path, warn-log
-  only for http path)
+  numeric segments index arrays), per-path latency budgets: `max_latency_ms` is the
+  cheap-path (http) budget and only warn-logs; the agent path hard-fails against
+  `max_latency_ms_agent` (default 600000 — live Computer-Use runs take minutes)
 
 ## Security (MVP)
 

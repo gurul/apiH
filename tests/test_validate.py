@@ -46,10 +46,14 @@ def test_get_path_indexes_arrays():
 
 
 def test_check_health_latency_budget_per_path():
-    health = {"max_latency_ms": 10}
     data = {"stories": [{"title": "t", "url": "https://example.com"}]}
-    assert check_health(data, health, 999, "agent") is False
+    health = {"max_latency_ms": 10, "max_latency_ms_agent": 500}
+    assert check_health(data, health, 999, "agent") is False  # over agent budget
+    assert check_health(data, health, 400, "agent") is True  # http budget ignored
     assert check_health(data, health, 999, "http") is True  # warn-log only for http
+    # agent default budget is 10 min — minutes-long live runs must pass
+    assert check_health(data, {"max_latency_ms": 10}, 240_000, "agent") is True
+    assert check_health(data, {"max_latency_ms": 10}, 900_000, "agent") is False
     assert check_health(data, None, 999, "agent") is True
 
 

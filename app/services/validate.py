@@ -70,15 +70,20 @@ def check_health(data: dict, health: dict | None, latency_ms: int, path: str) ->
         except (KeyError, IndexError):
             return False
 
-    max_latency = health.get("max_latency_ms")
-    if max_latency is not None and latency_ms > max_latency:
-        # hard fail only for the expensive agent path; cheap http just warns
-        if path == "agent":
+    # Two budgets: max_latency_ms is the cheap-path (http) budget and only warn-logs;
+    # the agent path hard-fails against its own budget (max_latency_ms_agent, default
+    # 10 min) since live Computer-Use runs legitimately take minutes, not seconds.
+    if path == "agent":
+        agent_budget = health.get("max_latency_ms_agent", 600000)
+        if agent_budget is not None and latency_ms > agent_budget:
             return False
-        logger.warning(
-            "http path latency %dms exceeded max_latency_ms budget %dms",
-            latency_ms,
-            max_latency,
-        )
+    else:
+        max_latency = health.get("max_latency_ms")
+        if max_latency is not None and latency_ms > max_latency:
+            logger.warning(
+                "http path latency %dms exceeded max_latency_ms budget %dms",
+                latency_ms,
+                max_latency,
+            )
 
     return True

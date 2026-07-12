@@ -66,7 +66,10 @@ def _build_health(output_schema: dict) -> dict:
             item_required = ((sub.get("items") or {}).get("required")) or []
             health["required_paths"] = [f"{prop}.0.{p}" for p in item_required]
             break
+    # Per-path budgets: http warn-logs over 15s; agent hard-fails over 10min (live
+    # Computer-Use runs legitimately take minutes — see check_health).
     health["max_latency_ms"] = 15000
+    health["max_latency_ms_agent"] = 600000
     return health
 
 
