@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "studio": "remotion studio src/index.ts",
-    "render": "remotion render src/index.ts APIH out/api-h-product-film.mp4",
+    "render": "remotion render src/index.ts APIH out/api-h-product-film.mp4 --muted",
     "still": "remotion still src/index.ts APIH-Still out/api-h-cover.png"
   },
   "dependencies": {

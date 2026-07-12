@@ -2,9 +2,11 @@
 
 ## Product film
 
-<video src="motion/out/api-h-product-film.mp4" poster="motion/out/api-h-cover.png" controls width="100%">
-  <a href="motion/out/api-h-product-film.mp4">Watch the API H product film</a>
-</video>
+<p align="center">
+  <video src="motion/out/api-h-product-film.mp4" poster="motion/out/api-h-cover.png" controls width="720">
+    <a href="motion/out/api-h-product-film.mp4">Watch the API H product film</a>
+  </video>
+</p>
 
 [Watch the 36-second API H product film](motion/out/api-h-product-film.mp4)
 
