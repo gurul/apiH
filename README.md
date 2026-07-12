@@ -210,7 +210,9 @@ curl -s -X POST http://127.0.0.1:8000/v1/workflows/hn-top-stories/run \
 ```
 
 For live H mode: copy `.env.example` to `.env`, set `HAI_API_KEY`, set
-`API_H_MOCK_H=false`, and install the optional `hai-agents` package.
+`API_H_MOCK_H=false`, and install the optional `hai-agents` package (`uv add hai-agents`).
+A full step-by-step live walkthrough — Craigslist via schema discovery, from clone to
+run — is in [docs/LIVE-DEMO.md](docs/LIVE-DEMO.md).
 
 Tests run fully offline (no network, no key):
 
