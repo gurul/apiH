@@ -67,15 +67,16 @@ Compilation stores a contract in SQLite. A run loads a selected contract, applie
 input defaults, executes its configured paths, validates the result, and records
 one run row.
 
-```text
-POST /compile:
-Client -> compiler -> optional H session -> versioned contract -> SQLite
-
-POST /run:
-Client -> router -> load contract from SQLite
-                 -> registered HTTP mapper -> allowlisted API
-                 -> H agent or mock when the agent path is used
-                 -> validate result -> save run to SQLite -> response
+```mermaid
+flowchart TD
+    C["Client<br/>curl · demo UI"] -->|"POST /compile"| COMP["Compiler<br/>resolve schemas · build contract"]
+    C -->|"POST /run"| RTR["Runtime router<br/>HTTP first · agent fallback"]
+    COMP -->|"optional discovery or verification session"| H["H Computer-Use agent<br/>live or mock"]
+    COMP -->|"versioned contract"| DB[("SQLite<br/>workflows · contracts · runs")]
+    RTR -->|"load contract"| DB
+    RTR -->|"path=http"| API["Registered HTTP mapper<br/>allowlisted API"]
+    RTR -->|"path=agent"| H
+    RTR -->|"validate result · save run"| C
 ```
 
 ### Compilation
@@ -113,6 +114,21 @@ the previous active version deprecated. It also attempts to export the JSON to
 | `force_path: "agent"` | Use the agent only; return 400 if that path is disabled |
 | `contract_version` supplied | Run that version, including a draft or deprecated version |
 | Every configured path fails | Store the failed run and return 502 with its `run_id` and path errors |
+
+A normal run is one router pass:
+
+```mermaid
+flowchart LR
+    R["POST /run"] --> Q{"contract has<br/>HTTP path?"}
+    Q -->|yes| HTTP["execute HTTP mapper"]
+    Q -->|no| AG["call H agent or mock"]
+    HTTP --> V{"execution and<br/>output checks OK?"}
+    V -->|yes| OK["200 · meta.path=http"]
+    V -->|"no, agent path enabled"| AG
+    AG --> V2{"output checks OK?"}
+    V2 -->|yes| OK2["200 · meta.path=agent"]
+    V2 -->|no| ERR["502 · run stored with<br/>run_id and path errors"]
+```
 
 The router validates input and output with JSON Schema. Contract health rules can
 also require a minimum array length and specific result fields. If an HTTP path
@@ -366,10 +382,41 @@ The five remaining records were deliberate agent probes on workflows that also h
 an HTTP path. All five succeeded. Across the 80 normal HTTP runs, no run had an H
 session identifier or recorded H cost.
 
+Per-task median latencies from the report, split by path because the two live on
+different scales (milliseconds versus seconds):
+
+```mermaid
+xychart-beta
+    title "HTTP path — median latency per task (ms)"
+    x-axis ["graphql-countries", "weather-wttr", "openlibrary", "hn-ask-show", "hn-top (burst)"]
+    y-axis "milliseconds" 0 --> 700
+    bar [64, 174, 180, 216, 648]
+```
+
+```mermaid
+xychart-beta
+    title "Agent path — median latency per task (s)"
+    x-axis ["spa-nav", "quotes-js", "books", "gh-repo", "demoqa", "algolia", "gh-issues", "wikipedia", "quotes-scroll", "multi-step", "craigslist", "consent", "hn-thread"]
+    y-axis "seconds" 0 --> 180
+    bar [23.8, 28.6, 31.7, 32.4, 34.3, 38.2, 53.2, 76.6, 78.5, 98.6, 103.3, 111.9, 170.2]
+```
+
 The evaluation also sent 20 concurrent Hacker News requests through HTTP. Their
 per-request latencies summed to 16.722 seconds at $0. The report estimates that 20
 agent requests at the measured agent mean would sum to 1,601.695 seconds and cost
-$1.3069. The one failed task reached a bot wall; the harness classified it as
+$1.3069. In the chart below, the rising line is that agent counterfactual at the
+measured $0.0653 mean cost per run; the flat line at $0 is the measured HTTP burst:
+
+```mermaid
+xychart-beta
+    title "Cumulative H cost of N requests (USD)"
+    x-axis "requests" [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+    y-axis "USD" 0 --> 1.4
+    line [0, 0.13, 0.26, 0.39, 0.52, 0.65, 0.78, 0.91, 1.05, 1.18, 1.31]
+    line [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+```
+
+The one failed task reached a bot wall; the harness classified it as
 `blocked` after 24.6 seconds and recorded no output.
 
 ### Run the evaluation
