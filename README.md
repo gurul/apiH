@@ -1,4 +1,4 @@
-# API H
+# API H (H Company Agent Project)
 
 API H turns a website workflow into a versioned JSON contract and exposes the
 workflow through a REST endpoint. At run time, it uses a registered HTTP mapper
