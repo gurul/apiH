@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     hai_api_key: str = ""
     hai_agent: str = "h/web-surfer-pro"
+    hai_environment: str = "EU"  # EU | US per hai_agents.HaiAgentsEnvironment
     api_h_mock_h: bool = True
     api_h_database_url: str = "sqlite:///./data/api_h.db"
     api_h_host: str = "127.0.0.1"

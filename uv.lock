@@ -39,6 +39,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "hai-agents" },
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "pydantic" },
@@ -57,6 +58,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "hai-agents", specifier = ">=1.0.6" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.22" },
     { name = "pydantic", specifier = ">=2.7" },
@@ -197,6 +199,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
+]
+
+[[package]]
+name = "hai-agents"
+version = "1.0.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f7/d0/09809712fc58fd029c62dfadc07940377a8095045e8926450cfc50ad7a2e/hai_agents-1.0.6.tar.gz", hash = "sha256:63186e0f32eec8a9566b453140d6e80467159f429918db4422f5009b9bb73ecc", size = 1899875, upload-time = "2026-07-08T22:23:58.452Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/11/fe/b2f1dca8d84a42629f5e153389d45d956cc029a3bedb6b6a25ecb571ca4f/hai_agents-1.0.6-py3-none-any.whl", hash = "sha256:aac8236e9cc25d040954e805febed2cc06eac4028e56627ae43afee6a27d3b7f", size = 226783, upload-time = "2026-07-08T22:23:56.972Z" },
 ]
 
 [[package]]

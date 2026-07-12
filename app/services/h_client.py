@@ -1,6 +1,7 @@
 """H Computer-Use client. Mock by default; hai_agents imported lazily in live mode only."""
 
 import asyncio
+import json
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -89,11 +90,21 @@ def _run_live(prompt: str, output_schema: dict, settings: Settings) -> HResult:
             "or set API_H_MOCK_H=true for mock mode"
         ) from e
 
-    answer_schema: Any = _schema_to_model(output_schema) or output_schema
+    # SDK requires a Pydantic model class (or None for the raw wire answer) — never
+    # a raw schema dict. Discovery passes {"type": "object"} and lands on None.
+    answer_schema = _schema_to_model(output_schema)
     try:
-        client = hai_agents.Client(api_key=settings.hai_api_key)
+        client = hai_agents.Client(
+            api_key=settings.hai_api_key,
+            environment=getattr(
+                hai_agents.HaiAgentsEnvironment, settings.hai_environment.upper()
+            ),
+        )
         result = client.run_session(
-            agent=settings.hai_agent, messages=prompt, answer_schema=answer_schema
+            agent=settings.hai_agent,
+            messages=prompt,
+            answer_schema=answer_schema,
+            timeout_seconds=600,
         )
     except Exception as e:
         # Scrub the key in case the SDK echoes it in an error message.
@@ -102,15 +113,40 @@ def _run_live(prompt: str, output_schema: dict, settings: Settings) -> HResult:
             msg = msg.replace(settings.hai_api_key, "***")
         raise RuntimeError(f"H session failed: {msg}") from None
 
-    answer = getattr(result, "answer", result)
+    # 'idle' is a success state too: the conversational session finished its run and
+    # awaits further messages. Judge by outcome + answer, not by status alone.
+    if result.status in ("failed", "timed_out", "interrupted") or result.outcome in (
+        "infeasible",
+        "blocked",
+    ):
+        raise RuntimeError(
+            f"H session {result.id} ended {result.status}"
+            f" (outcome={result.outcome}, error={result.error})"
+        )
+    answer = result.answer
     if isinstance(answer, BaseModel):
         answer = answer.model_dump()
+    if isinstance(answer, str):
+        # Without an answer_schema (discovery) the wire value is raw text — usually
+        # JSON, sometimes fenced in ```json blocks.
+        text = answer.strip()
+        if text.startswith("```"):
+            text = text.strip("`")
+            text = text.split("\n", 1)[1] if "\n" in text else text
+        try:
+            answer = json.loads(text)
+        except ValueError:
+            pass
+    if isinstance(answer, list):
+        answer = {"results": answer}
     if not isinstance(answer, dict):
-        raise RuntimeError("H session returned a non-object answer")
-    session_id = getattr(result, "session_id", None) or getattr(result, "id", None)
-    usage = getattr(result, "usage", None)
-    cost_usd = getattr(usage, "cost_usd", None) if usage is not None else None
-    return HResult(answer=answer, session_id=session_id, cost_usd=cost_usd, engine="h")
+        raise RuntimeError(
+            f"H session {result.id} returned a non-object answer"
+            f" (outcome={result.outcome})"
+        )
+    metrics = getattr(result.final_changes, "metrics", None) if result.final_changes else None
+    cost_usd = getattr(metrics, "total_cost", None) if metrics is not None else None
+    return HResult(answer=answer, session_id=result.id, cost_usd=cost_usd, engine="h")
 
 
 async def run_h_session(prompt: str, output_schema: dict) -> HResult:
