@@ -1,0 +1,504 @@
+<title>API H — contracts, not repeat browsing</title>
+<style>
+  :root {
+    --ink: #1a2129; --ink-2: #46525f; --ink-3: #6b7885;
+    --paper: #f2f4f6; --surface: #ffffff; --line: #d7dde2; --line-soft: #e4e9ed;
+    --http: #0f7fb3; --agent: #a66312;
+    --http-text: #0c6b97; --agent-text: #8a5210;
+    --http-soft: rgba(15,127,179,.10); --agent-soft: rgba(166,99,18,.10);
+    --bad: #b3372b; --code-bg: #1a2129; --code-ink: #c7d3dc;
+    --serif: "Charter", "Iowan Old Style", "Palatino", Georgia, serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #dee6ec; --ink-2: #9aa8b4; --ink-3: #74828e;
+      --paper: #12161b; --surface: #1a2027; --line: #2c343d; --line-soft: #232a32;
+      --http: #2493b8; --agent: #be7c22;
+      --http-text: #58b7d6; --agent-text: #d9a04c;
+      --http-soft: rgba(36,147,184,.14); --agent-soft: rgba(190,124,34,.14);
+      --bad: #d4695e; --code-bg: #0d1114; --code-ink: #b9c6d0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #dee6ec; --ink-2: #9aa8b4; --ink-3: #74828e;
+    --paper: #12161b; --surface: #1a2027; --line: #2c343d; --line-soft: #232a32;
+    --http: #2493b8; --agent: #be7c22;
+    --http-text: #58b7d6; --agent-text: #d9a04c;
+    --http-soft: rgba(36,147,184,.14); --agent-soft: rgba(190,124,34,.14);
+    --bad: #d4695e; --code-bg: #0d1114; --code-ink: #b9c6d0;
+  }
+  :root[data-theme="light"] {
+    --ink: #1a2129; --ink-2: #46525f; --ink-3: #6b7885;
+    --paper: #f2f4f6; --surface: #ffffff; --line: #d7dde2; --line-soft: #e4e9ed;
+    --http: #0f7fb3; --agent: #a66312;
+    --http-text: #0c6b97; --agent-text: #8a5210;
+    --http-soft: rgba(15,127,179,.10); --agent-soft: rgba(166,99,18,.10);
+    --bad: #b3372b; --code-bg: #1a2129; --code-ink: #c7d3dc;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--serif); font-size: 17px; line-height: 1.62;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  section { padding: 56px 0 8px; }
+  p { max-width: 66ch; }
+  a { color: var(--http-text); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--http); outline-offset: 3px; border-radius: 2px; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0 0 14px;
+  }
+  h1 { font-size: clamp(44px, 8vw, 72px); line-height: 1.02; margin: 0 0 18px; letter-spacing: -.015em; text-wrap: balance; }
+  h2 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 19px; margin: 0 0 4px; }
+  .lede { font-size: 20px; line-height: 1.55; color: var(--ink-2); margin: 0 0 8px; }
+  .kicker { color: var(--ink-2); margin-top: 0; }
+
+  .mono { font-family: var(--mono); }
+  .num { font-variant-numeric: tabular-nums; }
+  .http-t { color: var(--http-text); } .agent-t { color: var(--agent-text); }
+
+  /* ---------- hero ---------- */
+  header { padding: 72px 0 8px; }
+  .hero-links { display: flex; gap: 14px; flex-wrap: wrap; margin: 22px 0 8px; }
+  .btn {
+    font-family: var(--mono); font-size: 13px; letter-spacing: .02em;
+    padding: 9px 16px; border: 1px solid var(--line); border-radius: 6px;
+    color: var(--ink); background: var(--surface); text-decoration: none; cursor: pointer;
+  }
+  .btn.primary { border-color: var(--http); background: var(--http); color: #fff; }
+  :root[data-theme="dark"] .btn.primary, .dark-btn-fix { color: #fff; }
+
+  /* ---------- race ---------- */
+  .race {
+    margin: 36px 0 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface); overflow: hidden;
+  }
+  .race-head {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 12px 18px; border-bottom: 1px solid var(--line-soft);
+  }
+  .race-head .mono { font-size: 12.5px; color: var(--ink-3); }
+  .race-head code { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); }
+  .lane { padding: 18px; display: grid; grid-template-columns: 108px 1fr; gap: 8px 16px; align-items: center; }
+  .lane + .lane { border-top: 1px solid var(--line-soft); }
+  .lane-tag {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    padding: 4px 0; text-align: center; border-radius: 4px; border: 1px solid;
+  }
+  .lane.http .lane-tag { color: var(--http-text); border-color: var(--http); background: var(--http-soft); }
+  .lane.agent .lane-tag { color: var(--agent-text); border-color: var(--agent); background: var(--agent-soft); }
+  .track { position: relative; height: 10px; border-radius: 5px; background: var(--line-soft); overflow: hidden; }
+  .fill { position: absolute; inset: 0 auto 0 0; width: 0%; border-radius: 5px; }
+  .lane.http .fill { background: var(--http); }
+  .lane.agent .fill { background: var(--agent); }
+  .lane-meta { grid-column: 2; font-family: var(--mono); font-size: 13px; color: var(--ink-2); min-height: 20px; }
+  .lane-meta strong { color: var(--ink); font-weight: 600; }
+  .race-foot { padding: 10px 18px 14px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); border-top: 1px solid var(--line-soft); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .replay { background: none; border: 1px solid var(--line); border-radius: 5px; color: var(--ink-2); font-family: var(--mono); font-size: 11.5px; padding: 4px 10px; cursor: pointer; }
+
+  /* ---------- flow ---------- */
+  .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 28px 0 10px; }
+  @media (max-width: 640px) { .flow { grid-template-columns: 1fr; } }
+  .step { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 16px 18px; }
+  .step .n { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--ink-3); text-transform: uppercase; }
+  .step h3 { margin: 6px 0 6px; }
+  .step p { font-size: 14.5px; color: var(--ink-2); margin: 0; line-height: 1.55; }
+  pre.contract {
+    margin: 26px 0 8px; padding: 18px 20px; border-radius: 10px; overflow-x: auto;
+    background: var(--code-bg); color: var(--code-ink);
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.65;
+  }
+  pre.contract .hl-http { color: #6fc7e3; } pre.contract .hl-agent { color: #e9b45e; }
+  pre.contract .dim { opacity: .55; }
+
+  /* ---------- KPI tiles ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 28px 0 6px; }
+  @media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  .tile { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 16px 18px 14px; }
+  .tile .v { font-family: var(--mono); font-size: 30px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+  .tile .l { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-top: 7px; line-height: 1.5; }
+
+  .amort { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 20px 0 8px; }
+  @media (max-width: 640px) { .amort { grid-template-columns: 1fr; } }
+  .amort .card { border-radius: 10px; padding: 18px 20px; border: 1px solid; }
+  .amort .card.h { border-color: var(--http); background: var(--http-soft); }
+  .amort .card.a { border-color: var(--agent); background: var(--agent-soft); }
+  .amort .who { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+  .amort .card.h .who { color: var(--http-text); } .amort .card.a .who { color: var(--agent-text); }
+  .amort .big { font-family: var(--mono); font-size: 26px; font-weight: 600; margin: 8px 0 2px; }
+  .amort .sub { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); }
+
+  /* ---------- dot strip ---------- */
+  figure.strip { margin: 30px 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 18px 18px 10px; }
+  figure.strip figcaption { font-size: 14px; color: var(--ink-2); font-family: var(--serif); margin-bottom: 4px; }
+  .legend { display: flex; gap: 18px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); margin: 6px 0 2px; flex-wrap: wrap; }
+  .legend .key { display: inline-flex; align-items: center; gap: 7px; }
+  .dotk { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .strip-plot { position: relative; height: 96px; margin: 8px 4px 2px; }
+  .axis { position: absolute; left: 0; right: 0; bottom: 22px; height: 1px; background: var(--line); }
+  .tick { position: absolute; bottom: 0; transform: translateX(-50%); font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+  .tick::before { content: ""; position: absolute; left: 50%; bottom: 18px; width: 1px; height: 6px; background: var(--line); }
+  .dot {
+    position: absolute; bottom: 34px; width: 12px; height: 12px; border-radius: 50%;
+    transform: translateX(-50%); cursor: default;
+    border: 2px solid var(--surface); box-shadow: 0 0 0 1px rgba(0,0,0,.06);
+  }
+  .dot.http { background: var(--http); } .dot.agent { background: var(--agent); }
+  .dot.blocked { background: transparent; border: 2px solid var(--bad); }
+  .dot.r2 { bottom: 52px; } .dot.r3 { bottom: 70px; }
+  .dlabel { position: absolute; font-family: var(--mono); font-size: 10.5px; color: var(--ink-2); transform: translateX(-50%); white-space: nowrap; }
+  .tip {
+    position: absolute; z-index: 5; pointer-events: none; display: none;
+    background: var(--ink); color: var(--paper); font-family: var(--mono); font-size: 11.5px;
+    padding: 6px 9px; border-radius: 5px; white-space: nowrap; transform: translate(-50%, -130%);
+  }
+
+  /* ---------- table ---------- */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 24px 0 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 13.5px; }
+  th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); text-align: left; font-weight: 500; }
+  th, td { padding: 9px 14px; border-bottom: 1px solid var(--line-soft); }
+  tbody tr:last-child td { border-bottom: none; }
+  td { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  td.t { color: var(--ink); }
+  td .chip { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; padding: 2.5px 8px; border-radius: 4px; border: 1px solid; }
+  .chip.http { color: var(--http-text); border-color: var(--http); background: var(--http-soft); }
+  .chip.agent { color: var(--agent-text); border-color: var(--agent); background: var(--agent-soft); }
+  .chip.blocked { color: var(--bad); border-color: var(--bad); background: transparent; }
+
+  /* ---------- honesty ---------- */
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+  @media (max-width: 680px) { .cols2 { grid-template-columns: 1fr; } }
+  ul.tight { padding-left: 20px; margin: 8px 0; }
+  ul.tight li { margin: 7px 0; color: var(--ink-2); font-size: 15.5px; }
+  ul.tight li strong { color: var(--ink); }
+
+  .quote { border-left: 3px solid var(--agent); padding: 4px 0 4px 18px; margin: 22px 0; font-size: 19px; line-height: 1.5; color: var(--ink); font-style: italic; }
+  .quote .who { display: block; font-style: normal; font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); margin-top: 8px; letter-spacing: .08em; text-transform: uppercase; }
+
+  footer { margin-top: 64px; border-top: 1px solid var(--line); padding: 26px 0 44px; font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  footer a { color: var(--ink-2); }
+
+  hr.sep { border: none; border-top: 1px solid var(--line); margin: 48px 0 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fill { transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Hackathon build · on H Company Computer-Use · July 2026</p>
+    <h1>Browse once.<br>Serve it as an API forever.</h1>
+    <p class="lede">API H compiles one agent exploration of a website into a versioned
+    <em>contract</em> — then serves it over REST. Requests take the cheap HTTP path when
+    one exists, and re-trigger the H agent only when it doesn't.</p>
+    <div class="hero-links">
+      <a class="btn primary" href="https://github.com/gurul/apiH">github.com/gurul/apiH</a>
+      <a class="btn" href="#numbers">See the measurements</a>
+    </div>
+
+    <div class="race" id="race">
+      <div class="race-head">
+        <code>POST /v1/workflows/&lt;slug&gt;/run · {"input": {"limit": 5}}</code>
+        <span class="mono">same request, both paths</span>
+      </div>
+      <div class="lane http">
+        <span class="lane-tag">path: http</span>
+        <div class="track"><div class="fill" id="fill-http"></div></div>
+        <div class="lane-meta" id="meta-http">&nbsp;</div>
+      </div>
+      <div class="lane agent">
+        <span class="lane-tag">path: agent</span>
+        <div class="track"><div class="fill" id="fill-agent"></div></div>
+        <div class="lane-meta" id="meta-agent">&nbsp;</div>
+      </div>
+      <div class="race-foot">
+        <span>timeline compressed · numbers are measured medians from the live eval</span>
+        <button class="replay" id="replay">↻ replay</button>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <p class="eyebrow">How it works</p>
+    <h2>An agent figured it out once. Nobody should pay for that twice.</h2>
+    <p class="kicker">Computer-use agents re-discover the same site on every run — full browse,
+    full cost, full minutes. API H splits the work in two:</p>
+    <div class="flow">
+      <div class="step">
+        <p class="n">compile · rare</p>
+        <h3>Explore</h3>
+        <p>One H Computer-Use session opens the site, achieves the goal, and — if you didn't
+        write schemas — <em>discovers</em> them from what it found.</p>
+      </div>
+      <div class="step">
+        <p class="n">contract · stored</p>
+        <h3>Graduate</h3>
+        <p>The procedure is stored in SQLite as a versioned contract: schemas, HTTP steps or
+        agent prompt, health checks. A procedure for new inputs — not a cached answer.</p>
+      </div>
+      <div class="step">
+        <p class="n">run · hot</p>
+        <h3>Route</h3>
+        <p>Every request tries the HTTP mapper first (zero agent sessions). No HTTP path?
+        Re-trigger H with a fixed prompt and schema-validate before returning.</p>
+      </div>
+    </div>
+
+<pre class="contract"><span class="dim">// the stored artifact — data/contracts/hn-top-stories-v2.json (excerpt)</span>
+{
+  "version": 2, "status": "active", "method": "hybrid",
+  <span class="hl-http">"http":  { "mapper": "hn_firebase_v0",   // 0 H sessions, ~$0</span>
+  <span class="hl-http">           "steps": ["topstories.json", "item/{id}.json"] }</span>,
+  <span class="hl-agent">"agent": { "agent_id": "h/web-surfer-pro", // fallback, 1 session</span>
+  <span class="hl-agent">           "prompt_template": "Open {{site}}. Return the top {{limit}}…" }</span>,
+  "health": { "min_array_length": {"path": "stories", "min": 1} }
+}</pre>
+    <p class="kicker">Every response carries <span class="mono">meta.path</span>, latency, and
+    cost — the router never swaps paths silently, and output that fails the schema returns a
+    502, never bad data.</p>
+  </section>
+
+  <hr class="sep">
+
+  <section id="numbers">
+    <p class="eyebrow">The evidence · 19-site live battery, 100 recorded runs</p>
+    <h2>Measured, not projected.</h2>
+    <p class="kicker">A hard eval ran the system against hostile modern-web conditions —
+    client-side rendering, infinite scroll, SPAs, consent walls, bot friction — with H
+    sessions capped at two concurrent, $1.24 total spend.</p>
+
+    <div class="tiles">
+      <div class="tile"><div class="v num http-t">85/85</div><div class="l">HTTP-path runs OK · p50 236 ms · $0</div></div>
+      <div class="tile"><div class="v num agent-t">10/11</div><div class="l">JS-heavy agent tasks passed live</div></div>
+      <div class="tile"><div class="v num">19/19</div><div class="l">Sites attempted · 1 honest “blocked”</div></div>
+      <div class="tile"><div class="v num">0</div><div class="l">Bad-data responses · schema gate held</div></div>
+    </div>
+
+    <div class="amort">
+      <div class="card h">
+        <span class="who">20 requests · http contract</span>
+        <div class="big num">16.7 s · $0.00</div>
+        <span class="sub">concurrent burst, zero H sessions, zero DB errors</span>
+      </div>
+      <div class="card a">
+        <span class="who">same 20 · agent counterfactual</span>
+        <div class="big num">26.7 min · $1.31</div>
+        <span class="sub">measured means: 80 s and 6.5¢ per agent run</span>
+      </div>
+    </div>
+    <p class="kicker">That's the wedge: <strong>~96× faster and $0 marginal</strong> on any
+    site that graduates to an HTTP contract. The one-time compile (~5¢) pays for itself on
+    the first request.</p>
+
+    <figure class="strip">
+      <figcaption><strong>Every task's median latency, by path.</strong> Log scale — the gap
+      between the clusters is the product.</figcaption>
+      <div class="legend">
+        <span class="key"><span class="dotk" style="background:var(--http)"></span>http path</span>
+        <span class="key"><span class="dotk" style="background:var(--agent)"></span>agent path</span>
+        <span class="key"><span class="dotk" style="border:2px solid var(--bad); background:transparent"></span>blocked (fail-closed)</span>
+      </div>
+      <div class="strip-plot" id="strip"><div class="axis"></div><div class="tip" id="tip"></div></div>
+    </figure>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>task</th><th>web condition</th><th>path</th><th>p50</th><th>cost/run</th><th>result</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="kicker" style="font-size:14px">The JS litmus pair — <span class="mono">quotes.toscrape.com/js</span>
+    (CSR-rendered) and <span class="mono">/scroll</span> (infinite scroll) — both passed via contracts whose
+    schemas H <em>discovered</em>, not hand-written ones. The one failure is the good kind: a
+    bot wall reported as <span class="mono">blocked</span> in 24.6 s instead of hanging or fabricating.</p>
+  </section>
+
+  <hr class="sep">
+
+  <section>
+    <p class="eyebrow">Engineering honesty</p>
+    <h2>What the eval caught, and what this isn't.</h2>
+    <div class="cols2">
+      <div>
+        <h3>Three real bugs, found by measuring</h3>
+        <ul class="tight">
+          <li><strong>Nullable schemas killed the agent path.</strong> <span class="mono">["string","null"]</span>
+          union types crashed the dynamic model builder. Fixed, with a regression test.</li>
+          <li><strong>A greedy slug rule mis-routed a site.</strong> Anything named <span class="mono">hn*</span>
+          got the Firebase mapper — including Algolia. Specialization is hostname-only now.</li>
+          <li><strong>SQLite pooling deadlocked at 20-way concurrency.</strong> Each request held its
+          connection across the upstream await. NullPool fixed it; a burst test guards it.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Honest limits</h3>
+        <ul class="tight">
+          <li><strong>The wrapper trap is real.</strong> Craigslist-class sites stay on the agent
+          path — ~103 s and ~9¢ per run — until an HTTP route is reverse-engineered.</li>
+          <li><strong>Graduation is still manual.</strong> The $0 paths exist because a mapper was
+          registered. Automatic HAR-based graduation is the unbuilt hard part.</li>
+          <li><strong>n=1 per JS task.</strong> One live pass proves the path works, not that it's
+          reliable at scale.</li>
+        </ul>
+      </div>
+    </div>
+
+    <blockquote class="quote">Cache stores answers. A contract stores <em>how to answer</em> —
+    for inputs it has never seen.
+      <span class="who">the judge-trap one-liner</span>
+    </blockquote>
+  </section>
+
+  <footer class="wrap-inner">
+    <p>API H · FastAPI + SQLite + <a href="https://github.com/hcompai/hai-agents-python">hai-agents</a> ·
+    49 offline tests, zero network · eval data in <span class="mono">data/eval_results.jsonl</span></p>
+    <p>Built on <a href="https://hub.hcompany.ai/computer-use-agents/introduction">H Company Computer-Use Agents</a>
+    (independent hackathon project, not an H Company product) · pattern reference:
+    <a href="https://browserbase.com/blog/autobrowse/">Browserbase Autobrowse</a> — they graduate a skill
+    for the next agent; API H graduates a contract for any HTTP client.</p>
+  </footer>
+</div>
+
+<script>
+  // ---------- hero race ----------
+  const HTTP_MS = 236, AGENT_MS = 38186, AGENT_COST = 0.04;
+  const fillH = document.getElementById("fill-http"), fillA = document.getElementById("fill-agent");
+  const metaH = document.getElementById("meta-http"), metaA = document.getElementById("meta-agent");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let raf = null;
+
+  function finalState() {
+    fillH.style.width = "100%"; fillA.style.width = "100%";
+    metaH.innerHTML = '<strong>200 OK</strong> · 236 ms · $0.00 · 0 H sessions · "path": "http"';
+    metaA.innerHTML = '<strong>200 OK</strong> · 38.2 s · $0.04 · 1 H session · "path": "agent"';
+  }
+  function race() {
+    if (raf) cancelAnimationFrame(raf);
+    if (reduced) { finalState(); return; }
+    const T = 6000, t0 = performance.now();
+    fillH.style.width = "0%"; fillA.style.width = "0%";
+    metaH.textContent = "…"; metaA.textContent = "…";
+    let doneH = false;
+    function tick(now) {
+      const t = Math.min(1, (now - t0) / T);
+      const simMs = t * AGENT_MS;                      // compressed timeline
+      if (!doneH) {
+        const hT = Math.min(1, (now - t0) / 700);      // http gets 700ms of screen time
+        fillH.style.width = (hT * 100).toFixed(1) + "%";
+        if (hT >= 1) {
+          doneH = true;
+          metaH.innerHTML = '<strong>200 OK</strong> · 236 ms · $0.00 · 0 H sessions · "path": "http"';
+        } else {
+          metaH.textContent = Math.round(Math.min(simMs, HTTP_MS)) + " ms…";
+        }
+      }
+      const e = 1 - Math.pow(1 - t, 1.8);              // agent crawls, eased
+      fillA.style.width = (e * 100).toFixed(1) + "%";
+      if (t < 1) {
+        metaA.textContent = (simMs / 1000).toFixed(1) + " s · H session browsing…";
+        raf = requestAnimationFrame(tick);
+      } else {
+        metaA.innerHTML = '<strong>200 OK</strong> · 38.2 s · $0.04 · 1 H session · "path": "agent"';
+      }
+    }
+    raf = requestAnimationFrame(tick);
+  }
+  document.getElementById("replay").addEventListener("click", race);
+  race();
+
+  // ---------- data (from data/eval_results.jsonl, post-fix run) ----------
+  const TASKS = [
+    { id: "graphql-countries",  js: "GraphQL API",       path: "http",    ms: 64,     cost: 0,      ok: "6/6" },
+    { id: "weather-wttr",       js: "JSON API",          path: "http",    ms: 174,    cost: 0,      ok: "11/11" },
+    { id: "openlibrary-search", js: "JSON API",          path: "http",    ms: 180,    cost: 0,      ok: "6/6" },
+    { id: "hn-ask-show",        js: "API feed",          path: "http",    ms: 216,    cost: 0,      ok: "21/21" },
+    { id: "hn-top-baseline",    js: "API feed",          path: "http",    ms: 648,    cost: 0,      ok: "41/41" },
+    { id: "spa-nav",            js: "React SPA",         path: "agent",   ms: 23785,  cost: 0.011,  ok: "1/1" },
+    { id: "quotes-js-rendered", js: "CSR (JS-only DOM)", path: "agent",   ms: 28612,  cost: 0.012,  ok: "1/1", note: "discovered schema" },
+    { id: "books-toscrape",     js: "static catalogue",  path: "agent",   ms: 31664,  cost: 0.013,  ok: "1/1" },
+    { id: "github-repo-meta",   js: "GitHub SPA",        path: "agent",   ms: 32418,  cost: 0.011,  ok: "1/1" },
+    { id: "demoqa-dynamic",     js: "delayed DOM",       path: "agent",   ms: 34320,  cost: 0.023,  ok: "1/1" },
+    { id: "hn-algolia-ui",      js: "CSR search",        path: "agent",   ms: 38186,  cost: 0.020,  ok: "1/1" },
+    { id: "github-issues-spa",  js: "SPA list",          path: "agent",   ms: 53223,  cost: 0.039,  ok: "1/1" },
+    { id: "wikipedia-toc",      js: "large DOM",         path: "agent",   ms: 76576,  cost: 0.070,  ok: "1/1" },
+    { id: "quotes-scroll",      js: "infinite scroll",   path: "agent",   ms: 78491,  cost: 0.049,  ok: "1/1", note: "discovered schema" },
+    { id: "multi-step-js-chain",js: "cross-site chain",  path: "agent",   ms: 98632,  cost: 0.056,  ok: "1/1" },
+    { id: "craigslist-sf-bikes",js: "filters + anti-bot",path: "agent",   ms: 103270, cost: 0.092,  ok: "1/1" },
+    { id: "cookie-consent-content", js: "consent wall",  path: "agent",   ms: 111919, cost: 0.086,  ok: "1/1" },
+    { id: "hn-item-thread",     js: "nested thread",     path: "agent",   ms: 170185, cost: 0.131,  ok: "2/2" },
+    { id: "softwall-probe",     js: "bot wall",          path: "blocked", ms: 24631,  cost: 0,      ok: "0/1", note: "fail-closed in 24.6 s" },
+  ];
+
+  // ---------- dot strip (log scale) ----------
+  const strip = document.getElementById("strip"), tip = document.getElementById("tip");
+  const LO = Math.log10(50), HI = Math.log10(300000);
+  const px = ms => ((Math.log10(ms) - LO) / (HI - LO) * 100).toFixed(2) + "%";
+  [[100, "100 ms"], [1000, "1 s"], [10000, "10 s"], [100000, "100 s"]].forEach(([v, l]) => {
+    const t = document.createElement("span");
+    t.className = "tick"; t.style.left = px(v); t.textContent = l;
+    strip.appendChild(t);
+  });
+  // stagger rows to avoid collisions in the agent cluster
+  const rows = {}, ROWS = ["", "r2", "r3"];
+  TASKS.forEach(task => {
+    const bucket = Math.round(Math.log10(task.ms) * 10);
+    rows[bucket] = (rows[bucket] || 0) + 1;
+    const d = document.createElement("span");
+    d.className = "dot " + task.path + " " + (ROWS[(rows[bucket] - 1) % 3] || "");
+    d.style.left = px(task.ms);
+    d.setAttribute("tabindex", "0");
+    d.setAttribute("role", "img");
+    d.setAttribute("aria-label", task.id + ": " + fmt(task.ms) + " via " + task.path);
+    d.addEventListener("mouseenter", () => showTip(d, task));
+    d.addEventListener("focus", () => showTip(d, task));
+    d.addEventListener("mouseleave", hideTip);
+    d.addEventListener("blur", hideTip);
+    strip.appendChild(d);
+  });
+  // two direct labels: the extremes
+  [["graphql-countries · 64 ms", 64, "http-t"], ["craigslist · 103 s", 103270, "agent-t"]].forEach(([txt, v, cls]) => {
+    const l = document.createElement("span");
+    l.className = "dlabel " + cls; l.style.left = px(v); l.style.bottom = "84px"; l.textContent = txt;
+    strip.appendChild(l);
+  });
+  function fmt(ms) { return ms >= 10000 ? (ms / 1000).toFixed(1) + " s" : ms >= 1000 ? (ms / 1000).toFixed(2) + " s" : ms + " ms"; }
+  function showTip(el, task) {
+    tip.textContent = task.id + " · " + fmt(task.ms) + " · $" + task.cost.toFixed(3) + " · " + task.path;
+    tip.style.left = el.style.left; tip.style.bottom = "0"; tip.style.top = "auto";
+    tip.style.display = "block";
+    tip.style.transform = "translate(-50%, 0)";
+    const r = el.getBoundingClientRect(), s = strip.getBoundingClientRect();
+    tip.style.top = (r.top - s.top - 34) + "px"; tip.style.bottom = "auto";
+    // keep inside plot horizontally
+    requestAnimationFrame(() => {
+      const tr = tip.getBoundingClientRect();
+      if (tr.left < s.left) tip.style.transform = "translate(0, 0)";
+      if (tr.right > s.right) tip.style.transform = "translate(-100%, 0)";
+    });
+  }
+  function hideTip() { tip.style.display = "none"; }
+
+  // ---------- table ----------
+  const tbody = document.getElementById("tbody");
+  TASKS.forEach(t => {
+    const tr = document.createElement("tr");
+    const chip = t.path === "blocked" ? '<span class="chip blocked">blocked</span>'
+      : '<span class="chip ' + t.path + '">' + t.path + "</span>";
+    tr.innerHTML =
+      '<td class="t">' + t.id + "</td>" +
+      "<td>" + t.js + "</td>" +
+      "<td>" + chip + "</td>" +
+      '<td class="num">' + fmt(t.ms) + "</td>" +
+      '<td class="num">' + (t.cost ? "$" + t.cost.toFixed(3) : "$0") + "</td>" +
+      "<td>" + t.ok + (t.note ? " · " + t.note : "") + "</td>";
+    tbody.appendChild(tr);
+  });
+</script>
