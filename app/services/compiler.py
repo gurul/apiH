@@ -6,15 +6,15 @@ receptionist window everyone talks to afterwards.
 
 import copy
 import json
+from time import perf_counter
 from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.config import get_settings
-from app.services import contract_store, h_client, schema_infer
+from app.services import contract_store, h_client, route_discovery, schema_infer
 from app.services.http_executors.base import execute_http
-from app.services.http_executors.generated import validate_generated_url
 from app.services.validate import validate_output
 
 HN_HOSTS = {"news.ycombinator.com"}
@@ -139,6 +139,8 @@ _ROUTE_PLAN_SCHEMA = {
     "type": "object",
     "required": [
         "available",
+        "captured_json",
+        "candidates_json",
         "method",
         "url",
         "query_json",
@@ -149,6 +151,13 @@ _ROUTE_PLAN_SCHEMA = {
     ],
     "properties": {
         "available": {"type": "boolean"},
+        # Evidence: the network requests the agent actually observed (HAR-shaped or a
+        # simple request list, as a JSON string).
+        "captured_json": {"type": "string"},
+        # Zero or more candidate route plans extracted from that evidence, as a JSON
+        # array string. Each: {method, url, query, body, response_path, output_key}.
+        "candidates_json": {"type": "string"},
+        # Legacy single best route (still honored when candidates_json is empty).
         "method": {"type": "string"},
         "url": {"type": "string"},
         "query_json": {"type": "string"},
@@ -160,22 +169,83 @@ _ROUTE_PLAN_SCHEMA = {
 }
 
 
+def _candidate_specialization(candidate: dict) -> dict:
+    return {
+        "mapper": "generated_http_v1",
+        "description": "HTTP route derived from captured traffic and replay-verified",
+        "steps": [
+            {
+                "name": "generated_request",
+                "method": candidate["method"],
+                "url_template": candidate["url"],
+            }
+        ],
+        "generated_by": "h-computer-use",
+        "allowed_host": candidate["allowed_host"],
+        "plan": {
+            key: candidate[key]
+            for key in ("method", "url", "query", "body", "response_path", "output_key")
+        },
+    }
+
+
+async def _replay_matrix(
+    workflow: models.Workflow,
+    candidate: dict,
+    matrix: list[dict],
+    output_schema: dict,
+) -> tuple[bool, list[dict]]:
+    """Replay one candidate across every matrix row. All rows must pass to graduate.
+
+    Returns (all_passed, per-input results). Each result records the input, whether
+    execution and schema checks passed, latency, and any error — the verification
+    evidence stored in the contract.
+    """
+    spec = _candidate_specialization(candidate)
+    body = build_contract_body(
+        workflow,
+        engine="h",
+        session_id=None,
+        notes="candidate replay",
+        specialization=spec,
+    )
+    results: list[dict] = []
+    all_passed = True
+    for row in matrix:
+        record: dict = {"input": row, "ok": False, "schema_valid": False}
+        started = perf_counter()
+        try:
+            sample = await execute_http(body, row)
+            validate_output(sample, output_schema)
+            record.update(ok=True, schema_valid=True)
+        except Exception as exc:  # a single failing input disqualifies the candidate
+            record["error"] = str(exc)
+            all_passed = False
+        record["latency_ms"] = int((perf_counter() - started) * 1000)
+        results.append(record)
+    return all_passed, results
+
+
 async def generate_http_specialization(
     workflow: models.Workflow, hints: list[str]
 ) -> tuple[dict | None, str | None, str]:
-    """Ask H to discover a simple public JSON route and verify it before use."""
+    """Ask H to browse the site, capture its network traffic, derive route
+    candidates from that evidence, and replay-verify them across varied inputs."""
     input_schema = json.loads(workflow.input_schema_json)
     output_schema = json.loads(workflow.output_schema_json)
     defaults = schema_infer.input_defaults(input_schema)
     hint_text = "; ".join(hints) if hints else "none"
     prompt = (
         f"Open {workflow.site} and complete this workflow once: {workflow.goal}. "
-        "Then identify whether the workflow is backed by one unauthenticated public "
-        "JSON GET or POST request that can be replayed directly. Do not guess. "
-        "Return available=false unless you can identify the exact HTTPS endpoint. "
-        "Use {{input_name}} placeholders in the URL, query_json, or body_json. "
-        "query_json and body_json must be JSON object strings. response_path is a "
-        "dot-separated path into the response. output_key optionally wraps the selected "
+        "While completing it, record the network requests the page actually issues. "
+        "Return available=false unless the workflow is backed by unauthenticated "
+        "public JSON GET or POST requests that can be replayed directly. Do not guess. "
+        "captured_json: the observed requests as a JSON string (HAR entries or a list "
+        'of {method, url, query, body, content_type, status}). candidates_json: a JSON '
+        "array of the replayable route plans you extracted, each "
+        "{method, url, query, body, response_path, output_key}, best first. "
+        "Use {{input_name}} placeholders in url/query/body. response_path is a "
+        "dot-separated path into the response; output_key optionally wraps the selected "
         f"value to match this output schema: {json.dumps(output_schema)}. "
         f"Example inputs: {json.dumps(defaults)}. Developer hints: {hint_text}."
     )
@@ -184,48 +254,38 @@ async def generate_http_specialization(
     if not answer.get("available"):
         return None, result.session_id, str(answer.get("notes") or "no route found")
 
-    method = str(answer.get("method") or "").upper()
-    url = str(answer.get("url") or "")
-    if method not in {"GET", "POST"}:
-        return None, result.session_id, "agent proposed an unsupported HTTP method"
-    try:
-        allowed_host = validate_generated_url(url)
-        query = json.loads(answer.get("query_json") or "{}")
-        body = json.loads(answer.get("body_json") or "{}")
-    except (ValueError, TypeError, json.JSONDecodeError) as exc:
-        return None, result.session_id, f"agent route rejected: {exc}"
-    if not isinstance(query, dict) or not isinstance(body, dict):
-        return None, result.session_id, "agent route query/body must be JSON objects"
+    captured = route_discovery.parse_captured_requests(answer.get("captured_json"))
+    candidates = route_discovery.derive_route_candidates(answer, captured)
+    if not candidates:
+        return (
+            None,
+            result.session_id,
+            "no evidence-backed replayable route candidate in captured traffic",
+        )
 
-    plan = {
-        "method": method,
-        "url": url,
-        "query": query,
-        "body": body,
-        "response_path": str(answer.get("response_path") or ""),
-        "output_key": str(answer.get("output_key") or ""),
-    }
-    specialization = {
-        "mapper": "generated_http_v1",
-        "description": "HTTP route generated by H Computer-Use and replay-verified",
-        "steps": [{"name": "generated_request", "method": method, "url_template": url}],
-        "generated_by": "h-computer-use",
-        "allowed_host": allowed_host,
-        "plan": plan,
-    }
-    candidate = build_contract_body(
-        workflow,
-        engine="h",
-        session_id=result.session_id,
-        notes="Agent-generated HTTP route candidate",
-        specialization=specialization,
-    )
-    try:
-        sample = await execute_http(candidate, defaults)
-        validate_output(sample, output_schema)
-    except Exception as exc:  # candidate stays off unless replay and schema checks pass
-        return None, result.session_id, f"agent route failed verification: {exc}"
-    return specialization, result.session_id, str(answer.get("notes") or "verified")
+    matrix = route_discovery.build_input_matrix(input_schema, defaults)
+    evidence = [c.as_dict() for c in captured]
+    last_note = ""
+    for index, candidate in enumerate(candidates):
+        passed, replays = await _replay_matrix(
+            workflow, candidate, matrix, output_schema
+        )
+        if passed:
+            spec = _candidate_specialization(candidate)
+            spec["evidence"] = evidence
+            spec["verification"] = {
+                "replayed": True,
+                "schema_valid": True,
+                "input_count": len(replays),
+                "candidates_considered": len(candidates),
+                "candidate_index": index,
+                "replays": replays,
+            }
+            note = str(answer.get("notes") or "verified")
+            return spec, result.session_id, f"{note}; verified over {len(replays)} inputs"
+        failure = next((r.get("error") for r in replays if not r["ok"]), "schema mismatch")
+        last_note = f"candidate {index} failed replay: {failure}"
+    return None, result.session_id, f"all {len(candidates)} route candidates failed replay ({last_note})"
 
 
 async def discover_schemas(
@@ -280,7 +340,12 @@ def build_contract_body(
                     "generated_by": specialization["generated_by"],
                     "allowed_host": specialization["allowed_host"],
                     "plan": copy.deepcopy(specialization["plan"]),
-                    "verification": {"replayed": True, "schema_valid": True},
+                    "evidence": copy.deepcopy(specialization.get("evidence", [])),
+                    "verification": copy.deepcopy(
+                        specialization.get(
+                            "verification", {"replayed": True, "schema_valid": True}
+                        )
+                    ),
                 }
                 if specialization.get("generated_by")
                 else {}
