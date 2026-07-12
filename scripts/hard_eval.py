@@ -787,7 +787,13 @@ async def do_run(
         record["error"] = f"{type(e).__name__}: {e}"
     if not record["ok"]:
         record["latency_ms"] = int((time.perf_counter() - t0) * 1000)
-    if task["expected_path"] == "http" and record["path"] == "agent":
+    # A deliberate force_path=agent probe is not a trap — only a spontaneous
+    # fallthrough on an http-expected task is.
+    if (
+        task["expected_path"] == "http"
+        and record["path"] == "agent"
+        and force_path is None
+    ):
         record["note"] = "TRAP"
     record["error_class"] = infer_error_class(
         task,

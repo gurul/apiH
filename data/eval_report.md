@@ -1,30 +1,30 @@
 # API H — hard eval report
 
-Generated 2026-07-12T02:08:37+00:00 · base_url `http://127.0.0.1:8000` · h_mode `live` · K=2 · agent ops 20/20 · cost $0.3643/$2.00
+Generated 2026-07-12T02:26:00+00:00 · base_url `http://127.0.0.1:8000` · h_mode `live` · K=2 · agent ops 20/22 · cost $1.2415/$2.00
 
 ## Table 1 — per-task results
 
 | task_id | js | expected | diff | compile | runs ok/total | paths | latency p50/p95 ms | mean cost | error classes |
 |---|---|---|---|---|---|---|---|---|---|
-| hn-top-baseline | api | http | 1 | ok | 41/41 | {'http': 40, 'agent': 1} | 513 / 932 | $0.0153 | — |
-| hn-ask-show | api | http | 2 | ok | 21/21 | {'http': 20, 'agent': 1} | 243 / 1818 | $0.0131 | — |
-| wikipedia-toc | static | agent | 2 | ok | 1/1 | {'agent': 1} | 67350 / 67350 | $0.0620 | — |
-| github-repo-meta | spa | agent | 3 | ok | 0/1 | — | 7 / 7 | — | {'other': 1} |
-| craigslist-sf-bikes | softbot | agent | 4 | ok | 1/1 | {'agent': 1} | 208492 / 208492 | $0.0886 | — |
-| hn-algolia-ui | csr | agent | 3 | ok | 0/2 | — | 232 / 4 | — | {'schema': 1, 'other': 1} |
-| quotes-js-rendered | csr | agent | 3 | ok | 1/1 | {'agent': 1} | 28019 / 28019 | $0.0119 | — |
-| quotes-scroll | scroll | agent | 4 | ok | 1/1 | {'agent': 1} | 111023 / 111023 | $0.0306 | — |
-| weather-wttr | api | http | 1 | ok | 11/11 | {'http': 10, 'agent': 1} | 170 / 749 | $0.0237 | — |
-| openlibrary-search | api | http | 2 | ok | 5/6 | {'http': 5} | 134 / 218 | — | {'other': 1} |
-| books-toscrape | static | agent | 2 | ok | 1/1 | {'agent': 1} | 38121 / 38121 | $0.0135 | — |
-| demoqa-dynamic | dynamic | agent | 4 | ok | 1/1 | {'agent': 1} | 35335 / 35335 | $0.0231 | — |
-| spa-nav | spa | agent | 4 | ok | 1/1 | {'agent': 1} | 29877 / 29877 | $0.0170 | — |
-| cookie-consent-content | consent | agent | 4 | ok | 1/1 | {'agent': 1} | 66701 / 66701 | $0.0392 | — |
-| github-issues-spa | spa | agent | 4 | ok | 1/1 | {'agent': 1} | 68926 / 68926 | $0.0264 | — |
-| hn-item-thread | static | agent | 3 | ok | 0/1 | — | 195626 / 195626 | — | {'empty': 1} |
-| multi-step-js-chain | csr | agent | 5 | ok | 0/0 | — | — | — | — |
-| softwall-probe | softbot | agent | 5 | ok | 0/0 | — | — | — | — |
-| graphql-countries | graphql | http | 1 | ok | 5/6 | {'http': 5} | 163 / 446 | — | {'other': 1} |
+| hn-top-baseline | api | http | 1 | reused | 41/41 | {'http': 40, 'agent': 1} | 648 / 1046 | $0.0142 | — |
+| hn-ask-show | api | http | 2 | reused | 21/21 | {'http': 20, 'agent': 1} | 216 / 379 | $0.0126 | — |
+| wikipedia-toc | static | agent | 2 | reused | 1/1 | {'agent': 1} | 76576 / 76576 | $0.0700 | — |
+| github-repo-meta | spa | agent | 3 | reused | 1/1 | {'agent': 1} | 32418 / 32418 | $0.0111 | — |
+| craigslist-sf-bikes | softbot | agent | 4 | reused | 1/1 | {'agent': 1} | 103270 / 103270 | $0.0922 | — |
+| hn-algolia-ui | csr | agent | 3 | reused | 1/1 | {'agent': 1} | 38186 / 38186 | $0.0195 | — |
+| quotes-js-rendered | csr | agent | 3 | reused | 1/1 | {'agent': 1} | 28612 / 28612 | $0.0120 | — |
+| quotes-scroll | scroll | agent | 4 | reused | 1/1 | {'agent': 1} | 78491 / 78491 | $0.0488 | — |
+| weather-wttr | api | http | 1 | reused | 11/11 | {'http': 10, 'agent': 1} | 174 / 679 | $0.0241 | — |
+| openlibrary-search | api | http | 2 | reused | 6/6 | {'http': 5, 'agent': 1} | 180 / 291 | $0.1618 | — |
+| books-toscrape | static | agent | 2 | reused | 1/1 | {'agent': 1} | 31664 / 31664 | $0.0131 | — |
+| demoqa-dynamic | dynamic | agent | 4 | reused | 1/1 | {'agent': 1} | 34320 / 34320 | $0.0229 | — |
+| spa-nav | spa | agent | 4 | reused | 1/1 | {'agent': 1} | 23785 / 23785 | $0.0106 | — |
+| cookie-consent-content | consent | agent | 4 | reused | 1/1 | {'agent': 1} | 111919 / 111919 | $0.0860 | — |
+| github-issues-spa | spa | agent | 4 | reused | 1/1 | {'agent': 1} | 53223 / 53223 | $0.0389 | — |
+| hn-item-thread | static | agent | 3 | reused | 2/2 | {'agent': 2} | 170185 / 133290 | $0.1312 | — |
+| multi-step-js-chain | csr | agent | 5 | reused | 1/1 | {'agent': 1} | 98632 / 98632 | $0.0564 | — |
+| softwall-probe | softbot | agent | 5 | reused | 0/1 | — | 24631 / 24631 | — | {'blocked': 1} |
+| graphql-countries | graphql | http | 1 | reused | 6/6 | {'http': 5, 'agent': 1} | 64 / 219 | $0.2848 | — |
 
 ## Table 2 — cohorts
 
@@ -32,27 +32,27 @@ Cohorts: `http_api` (expected http), `agent_js_heavy` (csr|spa|scroll|consent|dy
 
 | cohort | tasks | runs | ok | success rate | latency p50/p95 ms | mean cost |
 |---|---|---|---|---|---|---|
-| http_api | 5 | 85 | 83 | 98% | 254 / 1818 | $0.0174 |
-| agent_js_heavy | 11 | 10 | 7 | 70% | 32606 / 111023 | $0.0338 |
-| agent_other | 3 | 3 | 2 | 67% | 67350 / 67350 | $0.0377 |
+| http_api | 5 | 85 | 85 | 100% | 236 / 1050 | $0.0995 |
+| agent_js_heavy | 11 | 11 | 10 | 91% | 38186 / 103270 | $0.0398 |
+| agent_other | 3 | 4 | 4 | 100% | 104933 / 133290 | $0.0864 |
 
 ## Table 3 — JS failure taxonomy (failed runs by error_class × js_profile)
 
 | error_class | api | consent | csr | dynamic | graphql | scroll | softbot | spa | static | total |
 |---|---|---|---|---|---|---|---|---|---|---|
-| schema | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
-| empty | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 |
-| blocked | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| schema | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| empty | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| blocked | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 |
 | timeout | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | hydration | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| other | 1 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 0 | 4 |
+| other | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## Table 4 — amortization (20× HN HTTP measured vs counterfactual agent)
 
 | variant | runs | total latency ms | total cost |
 |---|---|---|---|
-| measured: 20× HN via HTTP (W4 burst) | 20 (20 ok) | 14752 | $0.0000 |
-| counterfactual: 20× agent (measured means: 68162 ms, $0.0304/run) | 20 | 1363243 | 0.6071 |
+| measured: 20× HN via HTTP (W4 burst) | 20 (20 ok) | 16722 | $0.0000 |
+| counterfactual: 20× agent (measured means: 80085 ms, $0.0653/run) | 20 | 1601695 | 1.3069 |
 
 ## Gates
 
@@ -65,7 +65,7 @@ Cohorts: `http_api` (expected http), `agent_js_heavy` (csr|spa|scroll|consent|dy
 | G5 | discovery compiles (quotes-js-rendered, quotes-scroll) produced contracts | PASS |
 | G6 | agent_js_heavy cohort success rate ≥ 50% | PASS |
 | G7 | W4 burst (20 concurrent): zero 5xx / DB-lock errors | PASS |
-| G8 | budget respected (agent ops ≤ 20, cost ≤ $2.00) | PASS |
+| G8 | budget respected (agent ops ≤ 22, cost ≤ $2.00) | PASS |
 | G9 | record integrity: every ok run has a path; every failed run is classified | PASS |
 
 ## Narrative
@@ -74,27 +74,33 @@ Cohorts: `http_api` (expected http), `agent_js_heavy` (csr|spa|scroll|consent|dy
 Tasks served over HTTP: graphql-countries, hn-ask-show, hn-top-baseline, openlibrary-search, weather-wttr. 80/80 http-path runs completed with no H session attached — the contract, not the agent, does the work.
 
 **2. Does the router honor expected paths (any TRAP events)?**
-3 TRAP run(s) — http-expected tasks that fell through to the agent path.
+5 TRAP run(s) — http-expected tasks that fell through to the agent path.
 
 **3. How do JS-heavy profiles fare on the agent path vs other agent tasks?**
-agent_js_heavy success 70% vs agent_other 67% (Table 2).
+agent_js_heavy success 91% vs agent_other 100% (Table 2).
 
 **4. What failure classes dominate on JS-heavy tasks?**
-JS-heavy failures by class: other=2, schema=1 (Table 3).
+JS-heavy failures by class: blocked=1 (Table 3).
 
 **5. Did schema discovery (the JS litmus) produce usable contracts?**
 quotes-js-rendered: compile ok, 1 ok run(s); quotes-scroll: compile ok, 1 ok run(s).
 
 **6. What does HTTP amortization save vs 20 counterfactual agent runs?**
-Measured: 20 HTTP runs took 14752 ms total at $0.0000; 20 agent runs would take ~1363243 ms at measured mean agent cost (Table 4).
+Measured: 20 HTTP runs took 16722 ms total at $0.0000; 20 agent runs would take ~1601695 ms at measured mean agent cost (Table 4).
 
 **7. Does the system stay correct under concurrency and within budget?**
-W4: 20/20 ok, 0 5xx/DB errors. Budget: 20/20 agent ops, $0.3643/$2.00 spent; 3 op(s) skipped when the budget guard tripped: EXTRA:hn-item-thread:force-agent, EXTRA:multi-step-js-chain:run 1/1, EXTRA:softwall-probe:run 1/1
+W4: 20/20 ok, 0 5xx/DB errors. Budget: 20/22 agent ops, $1.2415/$2.00 spent; no ops skipped.
 
 ## Parallelism note
 
 H agent sessions were capped at K=2 concurrent (`--h-concurrency`), in line with H's multi-agent guidance: https://hub.hcompany.ai/computer-use-agents/multi-agent. Discovery compiles share the same semaphore since they consume a session in live mode.
 
-## Budget note
+## Erratum (post-run correction)
 
-Budget guard stopped launching new agent ops after 20 op(s) / $0.3643. Skipped: EXTRA:hn-item-thread:force-agent, EXTRA:multi-step-js-chain:run 1/1, EXTRA:softwall-probe:run 1/1
+G3's FAIL is a labeling artifact, not a router failure: all 5 "TRAP" runs were the
+eval's own deliberate `force_path=agent` probes (one per http-graduated contract, run
+to measure the agent counterfactual). Zero spontaneous http→agent fallthroughs
+occurred — every default-path run on an http-expected task served with `path=http`
+(80/80). The script now excludes forced probes from TRAP labeling; with that fix G3 is
+a PASS on this dataset. Similarly, the "mean cost" column for http tasks averages in
+the one forced agent probe — the http-path runs themselves all cost $0.00.
