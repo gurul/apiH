@@ -157,7 +157,9 @@ On activate contract: previous active → `deprecated`; set `workflows.active_co
 ## HTTP API surface (base http://127.0.0.1:8000)
 
 - `GET /health` → `{"ok": true, "h_mode": "live" | "mock"}`
-- `POST /v1/workflows` — body: slug, title, site, goal, input_schema, output_schema
+- `POST /v1/workflows` — body: slug, title, site, goal, input_schema?, output_schema?
+  (schemas optional — omit both and the first compile discovers them; `{{var}}`
+  placeholders in the goal become run inputs)
 - `GET /v1/workflows`
 - `GET /v1/workflows/{id_or_slug}`
 - `GET /v1/workflows/{id_or_slug}/contracts`
@@ -166,6 +168,14 @@ On activate contract: previous active → `deprecated`; set `workflows.active_co
 - `POST /v1/workflows/{id_or_slug}/compile` — body:
   `{"engine": "auto", "prefer_http_hints": [...], "activate": true}`
   - engine=auto: use H if HAI_API_KEY set and mock disabled, else mock
+  - **schema discovery**: when the workflow has no output schema, compile runs ONE
+    exploration session (H or mock) that achieves the goal; the sample answer is
+    schema-inferred into output_schema (union of item fields; required = fields
+    non-null in every item), input_schema is derived from `{{var}}` goal placeholders
+    (`limit` → integer default 5, others → string), both are persisted onto the
+    workflow, and the sample is stored in compile_meta.sample_answer. The discovery
+    session doubles as the compile probe — one H run, not two. Subsequent /run calls
+    reuse the stored contract.
   - HN specialization: when site host is news.ycombinator.com (or slug hn-*), attach the
     `hn_firebase_v0` http mapper and set `method=hybrid` (http-first with agent fallback)
   - generic sites: `method=agent`, store agent prompt + schema

@@ -135,12 +135,51 @@ The contract is a JSON document stored in `contracts.body_json` (and exported to
 The critical rule: **caching answers is not a contract.** A contract stores *how to
 fulfill any valid input* — new inputs get fresh data through the same plan.
 
+### Schema discovery — you don't have to write the schemas
+
+Create a workflow with only `slug`, `title`, `site`, and `goal`, and the first compile
+**discovers** the schemas: one H exploration session achieves the goal, the JSON it
+returns becomes the `output_schema` (inferred field by field — a field missing from some
+items becomes optional), and any `{{var}}` placeholders in your goal become the
+`input_schema` (`{{limit}}` gets integer semantics, everything else is a string).
+The discovered schemas are persisted onto the workflow, the sample answer is stored in
+the contract's `compile_meta.sample_answer` as a fixture, and every subsequent `/run`
+reuses the stored contract — discovery happens once, not per request.
+
+```bash
+# 1. Create — no schemas, just intent. {{limit}} becomes a run input.
+curl -s -X POST http://127.0.0.1:8000/v1/workflows \
+  -H 'content-type: application/json' \
+  -d '{
+    "slug": "craigslist-apartments",
+    "title": "Craigslist SF Bay apartments",
+    "site": "https://sfbay.craigslist.org/search/apa",
+    "goal": "Return the top {{limit}} apartment listings with title, price and url"
+  }' | jq
+
+# 2. Compile — the one H exploration run; discovers + stores schemas, contract v1.
+curl -s -X POST http://127.0.0.1:8000/v1/workflows/craigslist-apartments/compile \
+  -H 'content-type: application/json' \
+  -d '{"engine": "auto", "activate": true}' | jq
+
+# 3. Run — uses the stored contract from here on (agent path for Craigslist:
+#    no known public API, so each run re-triggers H; see the wrapper-trap caveat).
+curl -s -X POST http://127.0.0.1:8000/v1/workflows/craigslist-apartments/run \
+  -H 'content-type: application/json' \
+  -d '{"input": {"limit": 5}}' | jq
+```
+
+In mock mode the discovery answer is the deterministic placeholder, so the inferred
+schema is a placeholder too — recompile with live H (`HAI_API_KEY` set,
+`API_H_MOCK_H=false`) for real discovery. Explicit schemas at creation time are still
+accepted and skip discovery entirely (that's how the HN demo pins its exact shape).
+
 ## When H is called vs not
 
 | Situation | H agent called? |
 |---|---|
-| Compile in live mode (`HAI_API_KEY` set, mock off) | Yes — one Computer-Use session to verify the goal |
-| Compile in mock mode | No — probe skipped, contract still built |
+| Compile in live mode (`HAI_API_KEY` set, mock off) | Yes — one Computer-Use session to verify the goal (and discover schemas when none were given) |
+| Compile in mock mode | Probe skipped (discovery uses the deterministic mock), contract still built |
 | Run, `method=http`/`hybrid`, HTTP path succeeds | No |
 | Run, HTTP path fails or output fails validation/health, agent enabled | Yes (mock in mock mode) |
 | Run with `force_path=agent` | Yes (mock in mock mode) |

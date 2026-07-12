@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.config import get_settings
-from app.services import contract_store, h_client
+from app.services import contract_store, h_client, schema_infer
 
 HN_HOSTS = {"news.ycombinator.com"}
 
@@ -70,6 +70,37 @@ def _build_health(output_schema: dict) -> dict:
     return health
 
 
+def needs_discovery(workflow: models.Workflow) -> bool:
+    """True when the workflow was created without schemas (or with empty ones)."""
+    output_schema = json.loads(workflow.output_schema_json or "{}")
+    return not output_schema.get("properties")
+
+
+def _discovery_prompt(workflow: models.Workflow, defaults: dict) -> str:
+    goal = h_client.render_prompt(workflow.goal, {**defaults, "site": workflow.site})
+    return (
+        f"Open {workflow.site}. Goal: {goal}. "
+        "Achieve the goal once and return the result as a single JSON object whose "
+        'top-level keys name the collections (for example {"results": [...]}). '
+        "Use consistent field names across items; do not invent URLs — "
+        "omit unknown values rather than guessing."
+    )
+
+
+async def discover_schemas(
+    workflow: models.Workflow,
+) -> tuple[dict, dict, dict, str | None]:
+    """One exploration session (H or mock) → (input_schema, output_schema,
+    sample_answer, session_id). The sample doubles as the compile probe."""
+    input_schema = schema_infer.derive_input_schema(workflow.goal)
+    defaults = schema_infer.input_defaults(input_schema)
+    result = await h_client.run_h_session(
+        _discovery_prompt(workflow, defaults), {"type": "object"}
+    )
+    sample = result.answer if isinstance(result.answer, dict) else {"results": result.answer}
+    return input_schema, schema_infer.infer_json_schema(sample), sample, result.session_id
+
+
 def build_contract_body(
     workflow: models.Workflow,
     *,
@@ -77,6 +108,7 @@ def build_contract_body(
     engine: str,
     session_id: str | None,
     notes: str,
+    sample: dict | None = None,
 ) -> dict:
     input_schema = json.loads(workflow.input_schema_json)
     output_schema = json.loads(workflow.output_schema_json)
@@ -114,6 +146,8 @@ def build_contract_body(
             "engine": "h-computer-use" if engine == "h" else engine,
             "session_id": session_id,
             "notes": notes,
+            # Fixture from the discovery run, when one happened.
+            **({"sample_answer": sample} if sample is not None else {}),
         },
     }
 
@@ -152,7 +186,31 @@ async def compile_workflow(
     db.commit()
 
     session_id: str | None = None
-    if engine == "h":
+    sample: dict | None = None
+    if needs_discovery(workflow):
+        # The discovery session doubles as the compile probe — one H run, not two.
+        try:
+            input_schema, output_schema, sample, session_id = await discover_schemas(
+                workflow
+            )
+        except Exception as e:
+            job.status = "failed"
+            job.error = str(e)
+            job.finished_at = models.now_iso()
+            db.commit()
+            return schemas.CompileResponse(job=_job_out(job), contract=None)
+        workflow.input_schema_json = json.dumps(input_schema)
+        workflow.output_schema_json = json.dumps(output_schema)
+        workflow.updated_at = models.now_iso()
+        db.commit()
+        if engine == "mock":
+            notes_extra += (
+                " (mock discovery — placeholder schema; recompile with live H"
+                " for real discovery)"
+            )
+        else:
+            notes_extra += "; schemas discovered from one exploration run"
+    elif engine == "h":
         probe = (
             f"Open {workflow.site}. {workflow.goal}. "
             "Return only data matching the schema as JSON; do not invent URLs."
@@ -176,7 +234,7 @@ async def compile_workflow(
         else "Agent-only contract; no known HTTP path"
     ) + notes_extra
     body = build_contract_body(
-        workflow, hn=hn, engine=engine, session_id=session_id, notes=notes
+        workflow, hn=hn, engine=engine, session_id=session_id, notes=notes, sample=sample
     )
     contract = contract_store.insert_contract(db, workflow, body, method=body["method"])
     if req.activate:

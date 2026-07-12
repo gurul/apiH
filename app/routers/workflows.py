@@ -52,8 +52,8 @@ def create_workflow(
         title=body.title,
         site=body.site,
         goal=body.goal,
-        input_schema_json=json.dumps(body.input_schema),
-        output_schema_json=json.dumps(body.output_schema),
+        input_schema_json=json.dumps(body.input_schema or {}),
+        output_schema_json=json.dumps(body.output_schema or {}),
     )
     db.add(wf)
     db.commit()

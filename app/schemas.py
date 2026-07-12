@@ -14,9 +14,10 @@ class WorkflowCreate(BaseModel):
     slug: str
     title: str
     site: str
-    goal: str
-    input_schema: dict[str, Any]
-    output_schema: dict[str, Any]
+    goal: str  # may contain {{var}} placeholders — they become run inputs on discovery
+    # Omit both schemas to let compile DISCOVER them from one H exploration run.
+    input_schema: dict[str, Any] | None = None
+    output_schema: dict[str, Any] | None = None
 
     @field_validator("slug")
     @classmethod

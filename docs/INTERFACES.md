@@ -131,6 +131,21 @@ def get_contract_by_version(db: Session, workflow_id: str, version: int) -> mode
 def contract_out(c: models.Contract) -> schemas.ContractOut: ...
 ```
 
+## app/services/schema_infer.py
+
+```python
+def derive_input_schema(goal: str) -> dict:
+    """{{var}} placeholders in the goal → input properties ('site'/'goal' reserved;
+    'limit' → integer default 5 min 1 max 30; others → string default '')."""
+
+def input_defaults(input_schema: dict) -> dict:  # {name: default}
+    ...
+
+def infer_json_schema(sample: object) -> dict:
+    """Recursive inference. Arrays of objects merge: properties = union across items,
+    required = keys non-null in EVERY item."""
+```
+
 ## app/services/compiler.py
 
 ```python
@@ -157,7 +172,10 @@ async def compile_workflow(db: Session, workflow: models.Workflow,
     contract, return response with contract=None). Mock engine: skip the probe.
     Then build_contract_body, insert_contract, activate if req.activate,
     job status='completed', result_contract_id set, finished_at=now_iso().
-    Returns CompileResponse(job=..., contract=...)."""
+    Returns CompileResponse(job=..., contract=...).
+    Discovery: when needs_discovery(workflow) (no output schema), discover_schemas()
+    runs ONE exploration session that replaces the probe, persists inferred schemas
+    onto the workflow, and passes the sample into build_contract_body(sample=...)."""
 ```
 
 ## app/services/router.py  (runtime router — SPEC §Runtime router algorithm)
