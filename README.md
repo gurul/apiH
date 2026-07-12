@@ -8,8 +8,10 @@ response reports the path used, the contract version, and the path latency in
 `meta`.
 
 API H has registered HTTP mappers for four hosts: Hacker News, wttr.in, Open
-Library, and the Countries GraphQL API. Other hosts use the H agent for every
-run. Schema discovery infers JSON schemas; it does not discover HTTP APIs.
+Library, and the Countries GraphQL API. These four were chosen as the test set
+for the MVP evaluation, not as a product limit — any host can gain an HTTP
+mapper by registering one. Other hosts use the H agent for every run. Schema
+discovery infers JSON schemas; it does not discover HTTP APIs.
 
 ## Quick start
 
@@ -394,7 +396,16 @@ xychart-beta
 ```
 
 ```mermaid
-xychart-beta
+---
+config:
+  xyChart:
+    width: 800
+    height: 560
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#2a78d6"
+---
+xychart-beta horizontal
     title "Agent path — median latency per task (s)"
     x-axis ["spa-nav", "quotes-js", "books", "gh-repo", "demoqa", "algolia", "gh-issues", "wikipedia", "quotes-scroll", "multi-step", "craigslist", "consent", "hn-thread"]
     y-axis "seconds" 0 --> 180
@@ -404,12 +415,25 @@ xychart-beta
 The evaluation also sent 20 concurrent Hacker News requests through HTTP. Their
 per-request latencies summed to 16.722 seconds at $0. The report estimates that 20
 agent requests at the measured agent mean would sum to 1,601.695 seconds and cost
-$1.3069. In the chart below, the rising line is that agent counterfactual at the
-measured $0.0653 mean cost per run; the flat line at $0 is the measured HTTP burst:
+$1.3069. The chart compares those two series:
+
+- **Orange, rising** — the *agent counterfactual*: what the same 20 requests would
+  have cost if every one had gone through the H agent, at the measured $0.0653
+  mean cost per run.
+- **Blue, flat at $0** — the *measured HTTP burst*: what the 20 requests actually
+  cost on the registered HTTP path.
 
 ```mermaid
+---
+config:
+  xyChart:
+    width: 800
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#eb6834, #2a78d6"
+---
 xychart-beta
-    title "Cumulative H cost of N requests (USD)"
+    title "Cumulative H cost (USD) — orange: agent, blue: HTTP"
     x-axis "requests" [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
     y-axis "USD" 0 --> 1.4
     line [0, 0.13, 0.26, 0.39, 0.52, 0.65, 0.78, 0.91, 1.05, 1.18, 1.31]
@@ -464,8 +488,9 @@ Autobrowse and API H store different runtime artifacts.
 ## Limits and security
 
 - Many workflows remain on the agent path because only four HTTP mappers are
-  registered. A workflow that always uses H is an agent proxy with contract
-  validation and run history; it does not gain HTTP cost or latency savings.
+  registered — the four hosts picked as the MVP evaluation's test set. A
+  workflow that always uses H is an agent proxy with contract validation and
+  run history; it does not gain HTTP cost or latency savings.
 - API H does not check a site's terms of service or `robots.txt`. Review both before
   automating a site. The Hacker News mapper uses the documented public Firebase API.
 - Agent output can vary between runs. API H validates every result against the
@@ -474,9 +499,11 @@ Autobrowse and API H store different runtime artifacts.
   handling are outside this MVP.
 - Mock mode tests router plumbing. Its answer is shaped like Hacker News data and
   often fails schemas written for other sites.
-- HTTP executors allow HTTPS requests only to
+- HTTP executors allow HTTPS requests only to the four test hosts —
   `hacker-news.firebaseio.com`, `wttr.in`, `openlibrary.org`, and
-  `countries.trevorblades.com`, and reject every other destination.
+  `countries.trevorblades.com` — and reject every other destination. The
+  allowlist matches the MVP evaluation's test set; extend it when registering a
+  new mapper.
 - Application code does not log `HAI_API_KEY`. Keep the key in the ignored `.env`
   file and out of commands that may enter shell history.
 - Schema or site drift requires manual intervention. Recompile creates a version but
