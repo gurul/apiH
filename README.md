@@ -399,18 +399,6 @@ Deliberately out of scope for the MVP (see `docs/SPEC.md` §Non-goals):
 - Desktop computer-use
 - MCP server surface for the run endpoint
 
-## Pitch snippets
-
-**15 seconds:** "H agents can use any website but cost a full browse every time. API H
-compiles one run into a versioned contract and serves REST — HTTP when we can, H only
-when we must."
-
-**vs Autobrowse:** "Autobrowse graduates a skill for the next agent. We graduate a
-contract for any HTTP client."
-
-**Judge trap ('isn't this caching?'):** "Cache stores answers. Contract stores how to
-answer for new inputs."
-
 ## References
 
 - H Computer-Use Agents: https://hub.hcompany.ai/computer-use-agents/introduction
