@@ -256,3 +256,26 @@ async def test_post_json_allows_allowlisted_host():
     out = await base.post_json(COUNTRIES_URL, {"query": "{}"})
 
     assert out == {"ok": True}
+
+
+def test_schema_to_model_handles_nullable_union_types():
+    """Regression: ["string","null"] union types crashed _schema_to_model with
+    TypeError unhashable list — killed the agent path for any nullable schema."""
+    from app.services.h_client import _schema_to_model
+
+    schema = {
+        "type": "object",
+        "required": ["full_name", "stars"],
+        "properties": {
+            "full_name": {"type": "string"},
+            "stars": {"type": "integer"},
+            "latest_release_tag": {"type": ["string", "null"]},
+            "year": {"type": ["integer", "null"]},
+        },
+    }
+    model = _schema_to_model(schema)
+    assert model is not None
+    obj = model(full_name="a/b", stars=1, latest_release_tag=None, year=None)
+    assert obj.latest_release_tag is None
+    obj2 = model(full_name="a/b", stars=1, latest_release_tag="v1.0.6", year=2024)
+    assert obj2.year == 2024

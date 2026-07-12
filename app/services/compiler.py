@@ -83,12 +83,10 @@ def is_hn(workflow: models.Workflow) -> bool:
 
 
 def find_specialization(workflow: models.Workflow) -> dict | None:
+    # Hostname only. A slug prefix rule ("hn*") mis-specialized hn.algolia.com
+    # workflows onto the Firebase mapper (caught by the hard eval) — slugs lie.
     host = urlparse(workflow.site).hostname
-    if host in SPECIALIZATIONS:
-        return SPECIALIZATIONS[host]
-    if workflow.slug.startswith("hn"):
-        return SPECIALIZATIONS["news.ycombinator.com"]
-    return None
+    return SPECIALIZATIONS.get(host)
 
 
 def _field_names(output_schema: dict) -> list[str]:

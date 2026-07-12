@@ -57,7 +57,14 @@ def _mock_stories(limit: int) -> dict:
 
 def _schema_to_type(schema: dict, name: str) -> Any:
     t = schema.get("type")
-    if t in _JSON_TYPES:
+    if isinstance(t, list):
+        # Union types like ["string", "null"] — map the non-null member, optional.
+        members = [m for m in t if m != "null"]
+        if len(members) != 1:
+            return None
+        inner = _schema_to_type({**schema, "type": members[0]}, name)
+        return (inner | None) if inner is not None else None
+    if isinstance(t, str) and t in _JSON_TYPES:
         return _JSON_TYPES[t]
     if t == "array":
         item = _schema_to_type(schema.get("items") or {}, f"{name}_item")
